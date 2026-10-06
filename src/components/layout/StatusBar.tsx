@@ -1,4 +1,7 @@
 import { isDirty, useDocumentsStore } from '@/store/documents'
+import { GitHubIcon } from '@/components/ui/icons'
+
+const REPO_URL = 'https://github.com/menusal/markdown-editor'
 
 export function StatusBar() {
   const activePath = useDocumentsStore((s) => s.activePath)
@@ -27,6 +30,19 @@ export function StatusBar() {
           {dirty ? 'Unsaved' : 'Saved'}
         </span>
       ) : null}
+
+      <span className="h-16 w-px shrink-0 bg-soft-fog" aria-hidden />
+
+      <a
+        href={REPO_URL}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Built by menusal — view source on GitHub"
+        className="flex shrink-0 items-center gap-8 whitespace-nowrap text-caption leading-caption transition-colors hover:text-ink"
+      >
+        <GitHubIcon width={14} height={14} />
+        <span className="hidden sm:inline">menusal/markdown-editor</span>
+      </a>
     </footer>
   )
 }
