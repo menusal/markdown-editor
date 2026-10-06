@@ -8,13 +8,13 @@ export function useSaveActive() {
   const pushToast = useUiStore((s) => s.pushToast)
 
   return useCallback(async () => {
-    const { activePath, docs } = useDocumentsStore.getState()
-    if (!activePath) return
-    const doc = docs[activePath]
+    const { activeDocId, docs } = useDocumentsStore.getState()
+    if (!activeDocId) return
+    const doc = docs[activeDocId]
     if (!doc || doc.content === doc.savedContent) return
 
     try {
-      await save(activePath)
+      await save(activeDocId)
       pushToast(`Saved "${doc.name}"`, 'success')
     } catch {
       pushToast('Could not save the file', 'error')

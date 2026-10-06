@@ -2,39 +2,56 @@ import { useEffect } from 'react'
 import { useQueryState } from 'nuqs'
 
 import { findNode } from '@/lib/fs/directory'
-import { fileParam } from '@/lib/url'
-import { useDocumentsStore } from '@/store/documents'
+import { fileParam, projectParam } from '@/lib/url'
+import { makeDocId, useDocumentsStore } from '@/store/documents'
 import { useUiStore } from '@/store/ui'
 import { useWorkspaceStore } from '@/store/workspace'
+import type { TreeNode } from '@/lib/fs/types'
+
+const EMPTY_TREE: TreeNode[] = []
 
 /**
- * Opens the markdown referenced by the `?file=` query param.
+ * Keeps the `?project=` / `?file=` query params in sync with the stores:
+ * - activates the project referenced by the URL (initial load / back-forward)
+ * - opens the file referenced by the URL once its project is ready
  *
- * The URL is the single source of truth for *which* file should be open, so
- * this effect only reacts to changes of `file` / `tree` / `status`. It reads
- * the latest store state imperatively (instead of subscribing to `docs` and
- * `activePath`) to avoid a two-way sync that oscillated between the URL and
- * the store. Opening a file from the UI sets both the store and the URL.
+ * The URL is the single source of truth for *what* to open, so this hook only
+ * reacts to URL changes (UI actions write to both the stores and the URL) to
+ * avoid a two-way sync that oscillates.
  */
 export function useDocumentRouting() {
+  const [project] = useQueryState('project', projectParam)
   const [file] = useQueryState('file', fileParam)
   const status = useWorkspaceStore((s) => s.status)
-  const tree = useWorkspaceStore((s) => s.tree)
+  const activeProjectId = useWorkspaceStore((s) => s.activeProjectId)
+  const tree = useWorkspaceStore(
+    (s) => s.projects.find((p) => p.id === s.activeProjectId)?.tree ?? EMPTY_TREE,
+  )
+  const activateProject = useWorkspaceStore((s) => s.activateProject)
   const pushToast = useUiStore((s) => s.pushToast)
 
   useEffect(() => {
-    if (status !== 'ready' || !file) return
+    if (!project || project === activeProjectId) return
+    const exists = useWorkspaceStore.getState().projects.some((p) => p.id === project)
+    if (exists) void activateProject(project)
+  }, [project, activeProjectId, activateProject])
 
-    const { docs, activePath, activate, open } = useDocumentsStore.getState()
+  useEffect(() => {
+    if (status !== 'ready' || !file || !activeProjectId) return
 
-    if (docs[file]) {
-      if (activePath !== file) activate(file)
+    const { docs, activeDocId, activate, open } = useDocumentsStore.getState()
+    const docId = makeDocId(activeProjectId, file)
+
+    if (docs[docId]) {
+      if (activeDocId !== docId) activate(docId)
       return
     }
 
     const node = findNode(tree, file)
     if (node && node.kind === 'file') {
-      open(node).catch(() => pushToast(`Could not open "${node.name}"`, 'error'))
+      open(activeProjectId, node).catch(() =>
+        pushToast(`Could not open "${node.name}"`, 'error'),
+      )
     }
-  }, [file, status, tree, pushToast])
+  }, [file, status, activeProjectId, tree, pushToast])
 }

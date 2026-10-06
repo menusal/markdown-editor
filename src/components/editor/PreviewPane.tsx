@@ -8,9 +8,9 @@ import { useDocumentsStore } from '@/store/documents'
 import { useScrollSync } from '@/components/editor/scroll-sync-context'
 
 export function PreviewPane() {
-  const activePath = useDocumentsStore((s) => s.activePath)
+  const activeDocId = useDocumentsStore((s) => s.activeDocId)
   const content = useDocumentsStore((s) =>
-    s.activePath ? (s.docs[s.activePath]?.content ?? '') : '',
+    s.activeDocId ? (s.docs[s.activeDocId]?.content ?? '') : '',
   )
   const updateContent = useDocumentsStore((s) => s.updateContent)
 
@@ -24,20 +24,20 @@ export function PreviewPane() {
   }, [sync])
 
   const onToggleTask = useMemo(() => {
-    if (!activePath) return undefined
+    if (!activeDocId) return undefined
     return (line: number, checked: boolean) => {
-      const current = useDocumentsStore.getState().docs[activePath]?.content
+      const current = useDocumentsStore.getState().docs[activeDocId]?.content
       if (current == null) return
-      updateContent(activePath, setTaskAtLine(current, line, checked))
+      updateContent(activeDocId, setTaskAtLine(current, line, checked))
     }
-  }, [activePath, updateContent])
+  }, [activeDocId, updateContent])
 
   const components = useMemo(
     () => createMarkdownComponents({ onToggleTask }),
     [onToggleTask],
   )
 
-  if (!activePath) return null
+  if (!activeDocId) return null
 
   return (
     <div ref={scrollRef} className="scrollbar-thin h-full overflow-y-auto bg-pure-white">

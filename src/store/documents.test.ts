@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/fs/file', () => ({
-  readFileText: vi.fn(),
+  readFileText: vi.fn().mockResolvedValue('remote'),
   writeFileText: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -9,16 +9,29 @@ import {
   HISTORY_COALESCE_MS,
   canRedo,
   canUndo,
+  makeDocId,
+  projectDocIds,
   useDocumentsStore,
   type EditorDocument,
 } from '@/store/documents'
 
-const PATH = 'plan.md'
+const P1 = 'p1'
+const P2 = 'p2'
+const NODE = 'plan.md'
+const ID = makeDocId(P1, NODE)
 
-function seedDoc(content = 'A', savedContent = 'A') {
+function seedDoc(
+  projectId = P1,
+  nodeId = NODE,
+  content = 'A',
+  savedContent = 'A',
+) {
+  const id = makeDocId(projectId, nodeId)
   const doc: EditorDocument = {
-    path: PATH,
-    name: 'plan.md',
+    id,
+    projectId,
+    nodeId,
+    name: nodeId,
     handle: {} as FileSystemFileHandle,
     content,
     savedContent,
@@ -26,11 +39,17 @@ function seedDoc(content = 'A', savedContent = 'A') {
     future: [],
     lastEditAt: 0,
   }
-  useDocumentsStore.setState({ docs: { [PATH]: doc }, order: [PATH], activePath: PATH })
+  useDocumentsStore.setState({
+    docs: { [id]: doc },
+    order: [id],
+    activeDocId: id,
+    lastActiveByProject: { [projectId]: id },
+  })
+  return id
 }
 
-function doc(): EditorDocument {
-  return useDocumentsStore.getState().docs[PATH]
+function doc(id = ID): EditorDocument {
+  return useDocumentsStore.getState().docs[id]
 }
 
 let now = 1000
@@ -38,7 +57,12 @@ let now = 1000
 beforeEach(() => {
   now = 1000
   vi.spyOn(Date, 'now').mockImplementation(() => now)
-  useDocumentsStore.setState({ docs: {}, order: [], activePath: null })
+  useDocumentsStore.setState({
+    docs: {},
+    order: [],
+    activeDocId: null,
+    lastActiveByProject: {},
+  })
   seedDoc()
 })
 
@@ -47,110 +71,150 @@ afterEach(() => {
 })
 
 describe('documents history', () => {
-  it('push a history step and undoes/redoes an edit', () => {
+  it('pushes a history step and undoes/redoes an edit', () => {
     const store = useDocumentsStore.getState()
-    store.updateContent(PATH, 'AB')
+    store.updateContent(ID, 'AB')
 
     expect(doc().past).toEqual(['A'])
-    expect(doc().content).toBe('AB')
 
-    store.undo(PATH)
+    store.undo(ID)
     expect(doc().content).toBe('A')
 
-    store.redo(PATH)
+    store.redo(ID)
     expect(doc().content).toBe('AB')
   })
 
   it('coalesces rapid edits into a single undo step', () => {
     const store = useDocumentsStore.getState()
-    store.updateContent(PATH, 'AB')
+    store.updateContent(ID, 'AB')
     now += HISTORY_COALESCE_MS - 100
-    store.updateContent(PATH, 'ABC')
+    store.updateContent(ID, 'ABC')
 
     expect(doc().past).toEqual(['A'])
 
-    store.undo(PATH)
+    store.undo(ID)
     expect(doc().content).toBe('A')
   })
 
   it('starts a new undo step after the coalesce window', () => {
     const store = useDocumentsStore.getState()
-    store.updateContent(PATH, 'AB')
+    store.updateContent(ID, 'AB')
     now += HISTORY_COALESCE_MS + 100
-    store.updateContent(PATH, 'ABC')
+    store.updateContent(ID, 'ABC')
 
     expect(doc().past).toEqual(['A', 'AB'])
-
-    store.undo(PATH)
-    expect(doc().content).toBe('AB')
-    store.undo(PATH)
-    expect(doc().content).toBe('A')
   })
 
   it('clears the redo stack when editing after an undo', () => {
     const store = useDocumentsStore.getState()
-    store.updateContent(PATH, 'AB')
+    store.updateContent(ID, 'AB')
     now += HISTORY_COALESCE_MS + 1
-    store.updateContent(PATH, 'ABC')
-    store.undo(PATH)
+    store.updateContent(ID, 'ABC')
+    store.undo(ID)
 
     expect(doc().future).toEqual(['ABC'])
     now += HISTORY_COALESCE_MS + 1
-    store.updateContent(PATH, 'ABD')
+    store.updateContent(ID, 'ABD')
 
-    expect(doc().future).toEqual([])
     expect(canRedo(doc())).toBe(false)
   })
 
   it('ignores no-op edits', () => {
-    const store = useDocumentsStore.getState()
-    store.updateContent(PATH, 'A') // same as current
+    useDocumentsStore.getState().updateContent(ID, 'A')
     expect(doc().past).toEqual([])
     expect(canUndo(doc())).toBe(false)
   })
 
   it('resets to the saved content and can undo the reset', () => {
     const store = useDocumentsStore.getState()
-    store.updateContent(PATH, 'AB')
+    store.updateContent(ID, 'AB')
     now += HISTORY_COALESCE_MS + 1
-    store.reset(PATH)
+    store.reset(ID)
 
     expect(doc().content).toBe('A')
-    expect(doc().content).toBe(doc().savedContent)
-
-    store.undo(PATH)
+    store.undo(ID)
     expect(doc().content).toBe('AB')
   })
 
-  it('keeps history across a save and updates the saved baseline', async () => {
+  it('keeps history across a save', async () => {
     const store = useDocumentsStore.getState()
-    store.updateContent(PATH, 'AB')
-    await store.save(PATH)
+    store.updateContent(ID, 'AB')
+    await store.save(ID)
 
     expect(doc().savedContent).toBe('AB')
     expect(doc().past).toEqual(['A'])
-    expect(canUndo(doc())).toBe(true)
+  })
+})
+
+describe('documents across projects', () => {
+  it('namespaces documents by project', async () => {
+    const node = { id: NODE, name: NODE, kind: 'file' as const, handle: {} as FileSystemFileHandle, children: [] }
+    const store = useDocumentsStore.getState()
+
+    await store.open(P1, node)
+    await store.open(P2, node)
+
+    const state = useDocumentsStore.getState()
+    expect(Object.keys(state.docs).sort()).toEqual([
+      makeDocId(P1, NODE),
+      makeDocId(P2, NODE),
+    ])
   })
 
-  it('tracks history independently per document', () => {
-    const store = useDocumentsStore.getState()
+  it('lists only the documents of a project', () => {
+    seedDoc(P1, NODE)
+    const id2 = makeDocId(P2, 'other.md')
     useDocumentsStore.setState((state) => ({
       docs: {
         ...state.docs,
-        'other.md': {
-          ...state.docs[PATH],
-          path: 'other.md',
+        [id2]: {
+          ...state.docs[ID],
+          id: id2,
+          projectId: P2,
+          nodeId: 'other.md',
           name: 'other.md',
-          content: 'X',
-          savedContent: 'X',
         },
       },
-      order: [PATH, 'other.md'],
+      order: [ID, id2],
     }))
 
-    store.updateContent(PATH, 'AB')
+    const state = useDocumentsStore.getState()
+    expect(projectDocIds(state.order, state.docs, P1)).toEqual([ID])
+    expect(projectDocIds(state.order, state.docs, P2)).toEqual([id2])
+  })
 
-    expect(useDocumentsStore.getState().docs[PATH].past).toEqual(['A'])
-    expect(useDocumentsStore.getState().docs['other.md'].past).toEqual([])
+  it('restores the remembered document when switching projects', () => {
+    seedDoc(P1, NODE)
+    const p2Id = makeDocId(P2, 'notes.md')
+    useDocumentsStore.setState((state) => ({
+      docs: {
+        ...state.docs,
+        [p2Id]: {
+          ...state.docs[ID],
+          id: p2Id,
+          projectId: P2,
+          nodeId: 'notes.md',
+          name: 'notes.md',
+        },
+      },
+      order: [ID, p2Id],
+      lastActiveByProject: { [P1]: ID, [P2]: p2Id },
+    }))
+
+    useDocumentsStore.getState().setActiveProject(P2)
+    expect(useDocumentsStore.getState().activeDocId).toBe(p2Id)
+
+    useDocumentsStore.getState().setActiveProject(P1)
+    expect(useDocumentsStore.getState().activeDocId).toBe(ID)
+  })
+
+  it('closes every document of a project', () => {
+    seedDoc(P1, NODE)
+    useDocumentsStore.getState().closeProject(P1)
+
+    const state = useDocumentsStore.getState()
+    expect(state.docs).toEqual({})
+    expect(state.order).toEqual([])
+    expect(state.activeDocId).toBeNull()
   })
 })

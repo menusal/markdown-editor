@@ -5,16 +5,21 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import type { ThemeMode } from '@/lib/theme'
 import { VIEW_MODES, sidebarParam, viewParam, type ViewMode } from '@/lib/url'
+import { useProjectActions } from '@/hooks/useProjectActions'
 import { useSaveActive } from '@/hooks/useSaveActive'
 import { useTheme } from '@/hooks/useTheme'
 import { canRedo, canUndo, isDirty, useDocumentsStore } from '@/store/documents'
 import { useWorkspaceStore } from '@/store/workspace'
 import { Button } from '@/components/ui/Button'
+import { Menu, MenuItem } from '@/components/ui/Menu'
 import {
+  ChevronDownIcon,
   CodeIcon,
   ColumnsIcon,
   EyeIcon,
+  FileTextIcon,
   FolderIcon,
+  FolderOpenIcon,
   MonitorIcon,
   MoonIcon,
   RedoIcon,
@@ -35,11 +40,11 @@ export function Toolbar() {
   const [view, setView] = useQueryState('view', viewParam)
   const [sidebarOpen, setSidebarOpen] = useQueryState('sidebar', sidebarParam)
 
-  const openDirectory = useWorkspaceStore((s) => s.openDirectory)
   const supported = useWorkspaceStore((s) => s.supported)
+  const { openFolder, openLooseFiles } = useProjectActions()
 
   const activeDoc = useDocumentsStore((s) =>
-    s.activePath ? s.docs[s.activePath] : undefined,
+    s.activeDocId ? s.docs[s.activeDocId] : undefined,
   )
   const undo = useDocumentsStore((s) => s.undo)
   const redo = useDocumentsStore((s) => s.redo)
@@ -80,21 +85,21 @@ export function Toolbar() {
             <ToolbarIconButton
               label="Undo (Ctrl/Cmd+Z)"
               disabled={!canUndo(activeDoc)}
-              onClick={() => undo(activeDoc.path)}
+              onClick={() => undo(activeDoc.id)}
             >
               <UndoIcon />
             </ToolbarIconButton>
             <ToolbarIconButton
               label="Redo (Ctrl/Cmd+Shift+Z)"
               disabled={!canRedo(activeDoc)}
-              onClick={() => redo(activeDoc.path)}
+              onClick={() => redo(activeDoc.id)}
             >
               <RedoIcon />
             </ToolbarIconButton>
             <ToolbarIconButton
               label="Reset to saved"
               disabled={!isDirty(activeDoc)}
-              onClick={() => reset(activeDoc.path)}
+              onClick={() => reset(activeDoc.id)}
             >
               <ResetIcon />
             </ToolbarIconButton>
@@ -109,15 +114,48 @@ export function Toolbar() {
         >
           Save
         </Button>
-        <Button
-          variant="primary"
-          icon={<FolderIcon />}
-          disabled={!supported}
-          onClick={() => void openDirectory()}
-          title={supported ? undefined : 'Use Chrome or Edge'}
+        <Menu
+          align="right"
+          trigger={({ toggle, open }) => (
+            <Button
+              variant="primary"
+              icon={<FolderIcon />}
+              disabled={!supported}
+              onClick={toggle}
+              aria-haspopup="menu"
+              aria-expanded={open}
+              title={supported ? undefined : 'Use Chrome or Edge'}
+            >
+              <span className="flex items-center gap-8">
+                Open
+                <ChevronDownIcon width={14} height={14} />
+              </span>
+            </Button>
+          )}
         >
-          Open folder
-        </Button>
+          {({ close }) => (
+            <>
+              <MenuItem
+                icon={<FolderOpenIcon width={16} height={16} />}
+                onClick={() => {
+                  close()
+                  void openFolder()
+                }}
+              >
+                Open folder…
+              </MenuItem>
+              <MenuItem
+                icon={<FileTextIcon width={16} height={16} />}
+                onClick={() => {
+                  close()
+                  void openLooseFiles()
+                }}
+              >
+                Open files…
+              </MenuItem>
+            </>
+          )}
+        </Menu>
       </div>
     </header>
   )

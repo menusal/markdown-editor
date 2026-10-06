@@ -10,14 +10,20 @@ vi.mock('@uiw/react-codemirror', () => ({
 }))
 
 import { EditorPane } from '@/components/editor/EditorPane'
-import { useDocumentsStore } from '@/store/documents'
+import { makeDocId, useDocumentsStore } from '@/store/documents'
+
+const PROJECT_ID = 'p1'
+const NODE_ID = 'plan.md'
+const DOC_ID = makeDocId(PROJECT_ID, NODE_ID)
 
 describe('EditorPane', () => {
   beforeEach(() => {
     useDocumentsStore.setState({
       docs: {
-        'plan.md': {
-          path: 'plan.md',
+        [DOC_ID]: {
+          id: DOC_ID,
+          projectId: PROJECT_ID,
+          nodeId: NODE_ID,
           name: 'plan.md',
           handle: {} as FileSystemFileHandle,
           content: '# Plan',
@@ -27,8 +33,9 @@ describe('EditorPane', () => {
           lastEditAt: 0,
         },
       },
-      order: ['plan.md'],
-      activePath: 'plan.md',
+      order: [DOC_ID],
+      activeDocId: DOC_ID,
+      lastActiveByProject: { [PROJECT_ID]: DOC_ID },
     })
   })
 

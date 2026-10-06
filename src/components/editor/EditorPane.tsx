@@ -9,9 +9,9 @@ import { useDocumentsStore } from '@/store/documents'
 import { useScrollSync } from '@/components/editor/scroll-sync-context'
 
 function runHistoryAction(action: 'undo' | 'redo') {
-  const { activePath } = useDocumentsStore.getState()
-  if (!activePath) return true
-  useDocumentsStore.getState()[action](activePath)
+  const { activeDocId } = useDocumentsStore.getState()
+  if (!activeDocId) return true
+  useDocumentsStore.getState()[action](activeDocId)
   return true
 }
 
@@ -22,9 +22,9 @@ const historyKeymap = keymap.of([
 ])
 
 export function EditorPane() {
-  const activePath = useDocumentsStore((s) => s.activePath)
+  const activeDocId = useDocumentsStore((s) => s.activeDocId)
   const content = useDocumentsStore((s) =>
-    s.activePath ? (s.docs[s.activePath]?.content ?? '') : '',
+    s.activeDocId ? (s.docs[s.activeDocId]?.content ?? '') : '',
   )
   const updateContent = useDocumentsStore((s) => s.updateContent)
 
@@ -47,7 +47,7 @@ export function EditorPane() {
     return () => sync.registerEditor(null)
   }, [sync, view])
 
-  if (!activePath) return null
+  if (!activeDocId) return null
 
   return (
     <div className="h-full overflow-hidden">
@@ -64,7 +64,7 @@ export function EditorPane() {
           historyKeymap: false,
         }}
         onCreateEditor={(editorView) => setView(editorView)}
-        onChange={(value) => updateContent(activePath, value)}
+        onChange={(value) => updateContent(activeDocId, value)}
       />
     </div>
   )

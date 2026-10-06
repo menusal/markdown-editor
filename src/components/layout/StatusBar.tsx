@@ -1,25 +1,44 @@
-import { isDirty, useDocumentsStore } from '@/store/documents'
-import { GitHubIcon } from '@/components/ui/icons'
+import { projectDocIds, isDirty, useDocumentsStore } from '@/store/documents'
+import { activeProject, useWorkspaceStore } from '@/store/workspace'
+import { FolderIcon, GitHubIcon } from '@/components/ui/icons'
 
 const REPO_URL = 'https://github.com/menusal/markdown-editor'
 
 export function StatusBar() {
-  const activePath = useDocumentsStore((s) => s.activePath)
+  const project = useWorkspaceStore(activeProject)
+  const activeProjectId = useWorkspaceStore((s) => s.activeProjectId)
   const activeDoc = useDocumentsStore((s) =>
-    s.activePath ? s.docs[s.activePath] : undefined,
+    s.activeDocId ? s.docs[s.activeDocId] : undefined,
   )
-  const openCount = useDocumentsStore((s) => s.order.length)
+  const docs = useDocumentsStore((s) => s.docs)
+  const order = useDocumentsStore((s) => s.order)
+  const count = activeProjectId
+    ? projectDocIds(order, docs, activeProjectId).length
+    : 0
 
   const dirty = activeDoc ? isDirty(activeDoc) : false
 
   return (
     <footer className="flex items-center gap-16 border-t border-soft-fog bg-warm-canvas px-16 py-8 text-steel">
-      <span className="truncate font-mono text-caption leading-caption">
-        {activePath ?? 'No file open'}
+      <span className="flex min-w-0 items-center gap-8">
+        <FolderIcon width={14} height={14} className="shrink-0 text-silver" />
+        <span className="truncate text-caption leading-caption font-medium">
+          {project?.name ?? 'No project'}
+        </span>
+        {activeDoc ? (
+          <>
+            <span className="text-silver" aria-hidden>
+              /
+            </span>
+            <span className="truncate text-caption leading-caption">
+              {activeDoc.name}
+            </span>
+          </>
+        ) : null}
       </span>
 
       <span className="ml-auto whitespace-nowrap text-caption leading-caption">
-        {openCount} {openCount === 1 ? 'tab' : 'tabs'}
+        {count} {count === 1 ? 'tab' : 'tabs'}
       </span>
 
       {activeDoc ? (

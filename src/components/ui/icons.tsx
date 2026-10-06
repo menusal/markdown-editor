@@ -69,6 +69,31 @@ export function ChevronRightIcon(props: IconProps) {
   )
 }
 
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}
+
+export function CheckIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  )
+}
+
+export function FolderOpenIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1" />
+      <path d="M2.5 11.5A1 1 0 0 1 3.5 10h17a1 1 0 0 1 1 1.2l-1.3 6A2 2 0 0 1 18.2 19H5.8a2 2 0 0 1-2-1.6Z" />
+    </svg>
+  )
+}
+
 export function SidebarIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

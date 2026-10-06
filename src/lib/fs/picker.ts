@@ -1,3 +1,10 @@
+const MARKDOWN_TYPES = [
+  {
+    description: 'Markdown',
+    accept: { 'text/markdown': ['.md', '.markdown'] },
+  },
+]
+
 export function isFileSystemAccessSupported(): boolean {
   if (typeof window === 'undefined' || !('showDirectoryPicker' in window)) {
     return false
@@ -14,6 +21,14 @@ export async function pickDirectory(): Promise<FileSystemDirectoryHandle> {
   return window.showDirectoryPicker({
     id: 'md-editor',
     mode: 'readwrite',
+  })
+}
+
+export async function pickFiles(): Promise<FileSystemFileHandle[]> {
+  return window.showOpenFilePicker({
+    id: 'md-editor-files',
+    multiple: true,
+    types: MARKDOWN_TYPES,
   })
 }
 

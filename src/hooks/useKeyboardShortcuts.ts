@@ -2,13 +2,13 @@ import { useEffect } from 'react'
 import { useQueryState } from 'nuqs'
 
 import { sidebarParam } from '@/lib/url'
+import { useProjectActions } from '@/hooks/useProjectActions'
 import { useSaveActive } from '@/hooks/useSaveActive'
-import { useWorkspaceStore } from '@/store/workspace'
 
 export function useKeyboardShortcuts() {
   const saveActive = useSaveActive()
+  const { openFolder, openLooseFiles } = useProjectActions()
   const [, setSidebarOpen] = useQueryState('sidebar', sidebarParam)
-  const openDirectory = useWorkspaceStore((s) => s.openDirectory)
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -24,11 +24,12 @@ export function useKeyboardShortcuts() {
         void setSidebarOpen((open) => !open)
       } else if (key === 'o') {
         event.preventDefault()
-        void openDirectory()
+        if (event.shiftKey) void openLooseFiles()
+        else void openFolder()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [saveActive, setSidebarOpen, openDirectory])
+  }, [saveActive, setSidebarOpen, openFolder, openLooseFiles])
 }

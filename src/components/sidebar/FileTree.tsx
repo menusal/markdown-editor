@@ -1,49 +1,57 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useQueryState } from 'nuqs'
 
 import { cn } from '@/lib/cn'
-import { fileParam } from '@/lib/url'
 import { useDocumentsStore } from '@/store/documents'
 import { useUiStore } from '@/store/ui'
-import { useWorkspaceStore } from '@/store/workspace'
+import { useWorkspaceStore, type Project } from '@/store/workspace'
 import type { TreeNode } from '@/lib/fs/types'
+import { useProjectActions } from '@/hooks/useProjectActions'
 import { ChevronRightIcon, FileTextIcon, FolderIcon } from '@/components/ui/icons'
 
-export function FileTree() {
-  const tree = useWorkspaceStore((s) => s.tree)
-  const expanded = useWorkspaceStore((s) => s.expanded)
+export function FileTree({ project }: { project: Project }) {
   const toggleExpanded = useWorkspaceStore((s) => s.toggleExpanded)
   const open = useDocumentsStore((s) => s.open)
-  const activePath = useDocumentsStore((s) => s.activePath)
+  const activeDoc = useDocumentsStore((s) =>
+    s.activeDocId ? s.docs[s.activeDocId] : undefined,
+  )
   const pushToast = useUiStore((s) => s.pushToast)
-  const [, setFile] = useQueryState('file', fileParam)
+  const { selectFile } = useProjectActions()
+
+  const activeNodeId =
+    activeDoc && activeDoc.projectId === project.id ? activeDoc.nodeId : null
 
   const handleOpen = async (node: TreeNode) => {
     try {
-      await open(node)
-      void setFile(node.path)
+      await open(project.id, node)
+      selectFile(project.id, node.id)
     } catch {
       pushToast(`Could not open "${node.name}"`, 'error')
     }
   }
 
-  if (tree.length === 0) {
+  if (project.tree.length === 0) {
     return (
       <p className="px-16 py-12 text-body leading-body text-steel">
-        No <code className="font-mono">.md</code> files in this folder.
+        {project.kind === 'files' ? (
+          'No files opened yet.'
+        ) : (
+          <>
+            No <code className="font-mono">.md</code> files in this folder.
+          </>
+        )}
       </p>
     )
   }
 
   return (
     <ul className="space-y-4">
-      {tree.map((node) => (
+      {project.tree.map((node) => (
         <TreeItem
-          key={node.path}
+          key={node.id}
           node={node}
           depth={0}
-          expanded={expanded}
-          activePath={activePath}
+          expanded={project.expanded}
+          activeNodeId={activeNodeId}
           onToggle={toggleExpanded}
           onOpen={handleOpen}
         />
@@ -56,20 +64,20 @@ interface TreeItemProps {
   node: TreeNode
   depth: number
   expanded: Record<string, boolean>
-  activePath: string | null
-  onToggle: (path: string) => void
+  activeNodeId: string | null
+  onToggle: (nodeId: string) => void
   onOpen: (node: TreeNode) => void
 }
 
-function TreeItem({ node, depth, expanded, activePath, onToggle, onOpen }: TreeItemProps) {
-  const isOpen = expanded[node.path] ?? false
+function TreeItem({ node, depth, expanded, activeNodeId, onToggle, onOpen }: TreeItemProps) {
+  const isOpen = expanded[node.id] ?? false
 
   if (node.kind === 'directory') {
     return (
       <li>
         <button
           type="button"
-          onClick={() => onToggle(node.path)}
+          onClick={() => onToggle(node.id)}
           aria-expanded={isOpen}
           style={{ paddingLeft: 8 + depth * 16 }}
           className="flex w-full items-center gap-8 rounded-lg py-4 pr-12 text-left text-body leading-body font-medium text-ink transition-colors hover:bg-ash-mist"
@@ -96,11 +104,11 @@ function TreeItem({ node, depth, expanded, activePath, onToggle, onOpen }: TreeI
             >
               {node.children.map((child) => (
                 <TreeItem
-                  key={child.path}
+                  key={child.id}
                   node={child}
                   depth={depth + 1}
                   expanded={expanded}
-                  activePath={activePath}
+                  activeNodeId={activeNodeId}
                   onToggle={onToggle}
                   onOpen={onOpen}
                 />
@@ -112,7 +120,7 @@ function TreeItem({ node, depth, expanded, activePath, onToggle, onOpen }: TreeI
     )
   }
 
-  const active = activePath === node.path
+  const active = activeNodeId === node.id
 
   return (
     <li>

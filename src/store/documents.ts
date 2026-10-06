@@ -8,8 +8,16 @@ export const HISTORY_COALESCE_MS = 500
 /** Maximum number of undo steps kept per document. */
 export const HISTORY_LIMIT = 200
 
+export function makeDocId(projectId: string, nodeId: string): string {
+  return `${projectId}:${nodeId}`
+}
+
 export interface EditorDocument {
-  path: string
+  /** Globally unique id: `${projectId}:${nodeId}`. */
+  id: string
+  projectId: string
+  /** Node id within the project (relative path or loose-file id). */
+  nodeId: string
   name: string
   handle: FileSystemFileHandle
   content: string
@@ -24,18 +32,23 @@ export interface EditorDocument {
 
 interface DocumentsState {
   docs: Record<string, EditorDocument>
+  /** Open document ids, in tab order (across all projects). */
   order: string[]
-  activePath: string | null
+  activeDocId: string | null
+  /** Last active document per project, to restore it when switching back. */
+  lastActiveByProject: Record<string, string | null>
 
-  open: (node: TreeNode) => Promise<void>
-  activate: (path: string) => void
-  close: (path: string) => void
+  open: (projectId: string, node: TreeNode) => Promise<void>
+  activate: (docId: string) => void
+  close: (docId: string) => void
+  closeProject: (projectId: string) => void
   closeAll: () => void
-  updateContent: (path: string, content: string) => void
-  save: (path: string) => Promise<void>
-  undo: (path: string) => void
-  redo: (path: string) => void
-  reset: (path: string) => void
+  setActiveProject: (projectId: string | null) => void
+  updateContent: (docId: string, content: string) => void
+  save: (docId: string) => Promise<void>
+  undo: (docId: string) => void
+  redo: (docId: string) => void
+  reset: (docId: string) => void
 }
 
 export function isDirty(doc: EditorDocument): boolean {
@@ -54,6 +67,15 @@ export function canRedo(doc: EditorDocument): boolean {
   return doc.future.length > 0
 }
 
+/** Ids of the documents belonging to a project, in tab order. */
+export function projectDocIds(
+  order: string[],
+  docs: Record<string, EditorDocument>,
+  projectId: string,
+): string[] {
+  return order.filter((id) => docs[id]?.projectId === projectId)
+}
+
 function trimHistory(entries: string[]): string[] {
   return entries.length > HISTORY_LIMIT
     ? entries.slice(entries.length - HISTORY_LIMIT)
@@ -63,12 +85,14 @@ function trimHistory(entries: string[]): string[] {
 export const useDocumentsStore = create<DocumentsState>((set, get) => ({
   docs: {},
   order: [],
-  activePath: null,
+  activeDocId: null,
+  lastActiveByProject: {},
 
-  open: async (node) => {
-    const existing = get().docs[node.path]
+  open: async (projectId, node) => {
+    const docId = makeDocId(projectId, node.id)
+    const existing = get().docs[docId]
     if (existing) {
-      set({ activePath: node.path })
+      get().activate(docId)
       return
     }
 
@@ -77,8 +101,10 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
     set((state) => ({
       docs: {
         ...state.docs,
-        [node.path]: {
-          path: node.path,
+        [docId]: {
+          id: docId,
+          projectId,
+          nodeId: node.id,
           name: node.name,
           handle,
           content,
@@ -88,35 +114,96 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
           lastEditAt: 0,
         },
       },
-      order: state.order.includes(node.path)
-        ? state.order
-        : [...state.order, node.path],
-      activePath: node.path,
+      order: state.order.includes(docId) ? state.order : [...state.order, docId],
+      activeDocId: docId,
+      lastActiveByProject: { ...state.lastActiveByProject, [projectId]: docId },
     }))
   },
 
-  activate: (path) => {
-    if (get().docs[path]) set({ activePath: path })
-  },
-
-  close: (path) =>
+  activate: (docId) =>
     set((state) => {
-      const rest = { ...state.docs }
-      delete rest[path]
-      const order = state.order.filter((p) => p !== path)
-      let activePath = state.activePath
-      if (activePath === path) {
-        const index = state.order.indexOf(path)
-        activePath = order[index] ?? order[index - 1] ?? null
+      const doc = state.docs[docId]
+      if (!doc) return state
+      return {
+        activeDocId: docId,
+        lastActiveByProject: {
+          ...state.lastActiveByProject,
+          [doc.projectId]: docId,
+        },
       }
-      return { docs: rest, order, activePath }
     }),
 
-  closeAll: () => set({ docs: {}, order: [], activePath: null }),
-
-  updateContent: (path, content) =>
+  close: (docId) =>
     set((state) => {
-      const doc = state.docs[path]
+      const doc = state.docs[docId]
+      if (!doc) return state
+
+      const rest = { ...state.docs }
+      delete rest[docId]
+      const order = state.order.filter((id) => id !== docId)
+
+      if (state.activeDocId !== docId) {
+        return { docs: rest, order }
+      }
+
+      const siblings = state.order
+        .filter((id) => state.docs[id]?.projectId === doc.projectId)
+        .filter((id) => id !== docId)
+      const index = state.order
+        .filter((id) => state.docs[id]?.projectId === doc.projectId)
+        .indexOf(docId)
+      const next = siblings[index] ?? siblings[index - 1] ?? null
+
+      return {
+        docs: rest,
+        order,
+        activeDocId: next,
+        lastActiveByProject: {
+          ...state.lastActiveByProject,
+          [doc.projectId]: next,
+        },
+      }
+    }),
+
+  closeProject: (projectId) =>
+    set((state) => {
+      const rest: Record<string, EditorDocument> = {}
+      for (const [id, doc] of Object.entries(state.docs)) {
+        if (doc.projectId !== projectId) rest[id] = doc
+      }
+      const order = state.order.filter((id) => rest[id])
+      const lastActive = { ...state.lastActiveByProject }
+      delete lastActive[projectId]
+      const activeDocId =
+        state.activeDocId && rest[state.activeDocId] ? state.activeDocId : null
+      return { docs: rest, order, activeDocId, lastActiveByProject: lastActive }
+    }),
+
+  closeAll: () =>
+    set({ docs: {}, order: [], activeDocId: null, lastActiveByProject: {} }),
+
+  setActiveProject: (projectId) =>
+    set((state) => {
+      if (!projectId) {
+        const current = state.activeDocId
+        if (current && state.docs[current]) return state
+        return { activeDocId: null }
+      }
+
+      const current = state.activeDocId ? state.docs[state.activeDocId] : null
+      if (current && current.projectId === projectId) return state
+
+      const remembered = state.lastActiveByProject[projectId]
+      const ids = projectDocIds(state.order, state.docs, projectId)
+      const activeDocId =
+        remembered && state.docs[remembered] ? remembered : (ids[0] ?? null)
+
+      return { activeDocId }
+    }),
+
+  updateContent: (docId, content) =>
+    set((state) => {
+      const doc = state.docs[docId]
       if (!doc || doc.content === content) return state
 
       const now = Date.now()
@@ -126,33 +213,33 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
       return {
         docs: {
           ...state.docs,
-          [path]: { ...doc, content, past, future: [], lastEditAt: now },
+          [docId]: { ...doc, content, past, future: [], lastEditAt: now },
         },
       }
     }),
 
-  save: async (path) => {
-    const doc = get().docs[path]
+  save: async (docId) => {
+    const doc = get().docs[docId]
     if (!doc) return
     await writeFileText(doc.handle, doc.content)
     set((state) => ({
       docs: {
         ...state.docs,
-        [path]: { ...doc, savedContent: doc.content },
+        [docId]: { ...doc, savedContent: doc.content },
       },
     }))
   },
 
-  undo: (path) =>
+  undo: (docId) =>
     set((state) => {
-      const doc = state.docs[path]
+      const doc = state.docs[docId]
       if (!doc || doc.past.length === 0) return state
 
       const previous = doc.past[doc.past.length - 1]
       return {
         docs: {
           ...state.docs,
-          [path]: {
+          [docId]: {
             ...doc,
             content: previous,
             past: doc.past.slice(0, -1),
@@ -163,16 +250,16 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
       }
     }),
 
-  redo: (path) =>
+  redo: (docId) =>
     set((state) => {
-      const doc = state.docs[path]
+      const doc = state.docs[docId]
       if (!doc || doc.future.length === 0) return state
 
       const next = doc.future[0]
       return {
         docs: {
           ...state.docs,
-          [path]: {
+          [docId]: {
             ...doc,
             content: next,
             past: trimHistory([...doc.past, doc.content]),
@@ -183,15 +270,15 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
       }
     }),
 
-  reset: (path) =>
+  reset: (docId) =>
     set((state) => {
-      const doc = state.docs[path]
+      const doc = state.docs[docId]
       if (!doc || doc.content === doc.savedContent) return state
 
       return {
         docs: {
           ...state.docs,
-          [path]: {
+          [docId]: {
             ...doc,
             content: doc.savedContent,
             past: trimHistory([...doc.past, doc.content]),

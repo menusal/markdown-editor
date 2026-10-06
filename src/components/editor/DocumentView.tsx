@@ -10,7 +10,7 @@ import { CodeIcon } from '@/components/ui/icons'
 
 export function DocumentView() {
   const [view] = useQueryState('view', viewParam)
-  const hasActive = useDocumentsStore((s) => Boolean(s.activePath))
+  const hasActive = useDocumentsStore((s) => Boolean(s.activeDocId))
 
   if (!hasActive) {
     return (

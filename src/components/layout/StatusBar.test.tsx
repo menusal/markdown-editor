@@ -3,9 +3,19 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { StatusBar } from '@/components/layout/StatusBar'
 import { useDocumentsStore } from '@/store/documents'
+import { useWorkspaceStore } from '@/store/workspace'
 
 beforeEach(() => {
-  useDocumentsStore.setState({ docs: {}, order: [], activePath: null })
+  useWorkspaceStore.setState({
+    projects: [],
+    activeProjectId: null,
+  })
+  useDocumentsStore.setState({
+    docs: {},
+    order: [],
+    activeDocId: null,
+    lastActiveByProject: {},
+  })
 })
 
 describe('StatusBar', () => {
