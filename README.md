@@ -77,6 +77,8 @@ Unit tests run with [Vitest](https://vitest.dev) + jsdom:
 - `scroll-sync.test.ts` — the editor/preview proportional scroll sync (ratio mapping both directions, echo suppression, non-scrollable and unregistered panes, teardown).
 - `documents.test.ts` — per-document undo/redo history and reset (coalescing, redo clearing, save baseline, isolation between docs).
 - `components.test.tsx` — interactive task-list checkboxes in the preview (enabled inputs, correct source line/state on toggle).
+- `picker.test.ts` — browser compatibility detection (Chromium picker + writable handles).
+- `WorkspaceGate.test.tsx` — the home shows a notice on unsupported browsers.
 - `EditorPane.test.tsx` — regression guard: the CodeMirror container must keep a definite height so the editor can scroll.
 - `theme.test.ts` — theme-mode resolution and persistence.
 

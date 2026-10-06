@@ -1,5 +1,6 @@
 import { useWorkspaceStore } from '@/store/workspace'
 import { Workspace } from '@/components/editor/Workspace'
+import { BrowserNotice } from '@/components/ui/BrowserNotice'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { FolderIcon, SpinnerIcon } from '@/components/ui/icons'
@@ -62,6 +63,7 @@ export function WorkspaceGate() {
       icon={<FolderIcon width={28} height={28} />}
       title="Review plans and SDD. Edit markdown locally."
       description="A local-first editor to read, review and edit your markdown — plans, specs and SDD docs. Open a folder to browse its .md files; everything stays on your machine, nothing is uploaded."
+      notice={!supported ? <BrowserNotice /> : undefined}
       action={
         <Button
           variant="primary"

@@ -1,5 +1,13 @@
 export function isFileSystemAccessSupported(): boolean {
-  return typeof window !== 'undefined' && 'showDirectoryPicker' in window
+  if (typeof window === 'undefined' || !('showDirectoryPicker' in window)) {
+    return false
+  }
+  // Safari exposes the picker but cannot write files (no createWritable), so
+  // requiring it keeps the "unsupported browser" notice honest.
+  return (
+    typeof FileSystemFileHandle !== 'undefined' &&
+    typeof FileSystemFileHandle.prototype.createWritable === 'function'
+  )
 }
 
 export async function pickDirectory(): Promise<FileSystemDirectoryHandle> {
