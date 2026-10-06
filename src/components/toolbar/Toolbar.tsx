@@ -1,12 +1,13 @@
 import { motion } from 'motion/react'
 import { useQueryState } from 'nuqs'
+import type { ReactNode } from 'react'
 
 import { cn } from '@/lib/cn'
 import type { ThemeMode } from '@/lib/theme'
 import { VIEW_MODES, sidebarParam, viewParam, type ViewMode } from '@/lib/url'
 import { useSaveActive } from '@/hooks/useSaveActive'
 import { useTheme } from '@/hooks/useTheme'
-import { useDocumentsStore, isDirty } from '@/store/documents'
+import { canRedo, canUndo, isDirty, useDocumentsStore } from '@/store/documents'
 import { useWorkspaceStore } from '@/store/workspace'
 import { Button } from '@/components/ui/Button'
 import {
@@ -16,9 +17,12 @@ import {
   FolderIcon,
   MonitorIcon,
   MoonIcon,
+  RedoIcon,
+  ResetIcon,
   SaveIcon,
   SidebarIcon,
   SunIcon,
+  UndoIcon,
 } from '@/components/ui/icons'
 
 const viewMeta: Record<ViewMode, { label: string; icon: typeof ColumnsIcon }> = {
@@ -37,6 +41,9 @@ export function Toolbar() {
   const activeDoc = useDocumentsStore((s) =>
     s.activePath ? s.docs[s.activePath] : undefined,
   )
+  const undo = useDocumentsStore((s) => s.undo)
+  const redo = useDocumentsStore((s) => s.redo)
+  const reset = useDocumentsStore((s) => s.reset)
   const canSave = Boolean(activeDoc && isDirty(activeDoc))
   const saveActive = useSaveActive()
 
@@ -68,6 +75,31 @@ export function Toolbar() {
 
       <div className="ml-auto flex items-center gap-8">
         <ViewSwitcher view={view} onChange={(mode) => setView(mode)} />
+        {view !== 'preview' && activeDoc ? (
+          <div className="flex items-center gap-2">
+            <ToolbarIconButton
+              label="Undo (Ctrl/Cmd+Z)"
+              disabled={!canUndo(activeDoc)}
+              onClick={() => undo(activeDoc.path)}
+            >
+              <UndoIcon />
+            </ToolbarIconButton>
+            <ToolbarIconButton
+              label="Redo (Ctrl/Cmd+Shift+Z)"
+              disabled={!canRedo(activeDoc)}
+              onClick={() => redo(activeDoc.path)}
+            >
+              <RedoIcon />
+            </ToolbarIconButton>
+            <ToolbarIconButton
+              label="Reset to saved"
+              disabled={!isDirty(activeDoc)}
+              onClick={() => reset(activeDoc.path)}
+            >
+              <ResetIcon />
+            </ToolbarIconButton>
+          </div>
+        ) : null}
         <ThemeToggle />
         <Button
           variant="secondary"
@@ -95,6 +127,33 @@ const themeMeta: Record<ThemeMode, { label: string; icon: typeof SunIcon }> = {
   system: { label: 'Theme: system', icon: MonitorIcon },
   light: { label: 'Theme: light', icon: SunIcon },
   dark: { label: 'Theme: dark', icon: MoonIcon },
+}
+
+interface ToolbarIconButtonProps {
+  label: string
+  disabled?: boolean
+  onClick: () => void
+  children: ReactNode
+}
+
+function ToolbarIconButton({
+  label,
+  disabled,
+  onClick,
+  children,
+}: ToolbarIconButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="flex size-32 shrink-0 items-center justify-center rounded-full text-steel transition-colors enabled:hover:bg-ash-mist enabled:hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+    >
+      {children}
+    </button>
+  )
 }
 
 function ThemeToggle() {

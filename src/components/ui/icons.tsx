@@ -138,3 +138,31 @@ export function MonitorIcon(props: IconProps) {
   )
 }
 
+export function UndoIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9 7 4 12l5 5" />
+      <path d="M4 12h11a5 5 0 0 1 0 10h-2" />
+    </svg>
+  )
+}
+
+export function RedoIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m15 7 5 5-5 5" />
+      <path d="M20 12H9a5 5 0 0 0 0 10h2" />
+    </svg>
+  )
+}
+
+export function ResetIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
+  )
+}
+
+

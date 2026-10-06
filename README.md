@@ -28,6 +28,7 @@ This app relies on the [**File System Access API**](https://developer.mozilla.or
 - **Formatted preview** with GFM support — tables, task lists, code blocks and more.
 - **Split view** with a draggable divider and synchronized scrolling, plus editor-only and preview-only modes.
 - **Edit & save** — write changes back to disk in place. `Cmd/Ctrl + S` or the **Save** button.
+- **Undo / redo / reset** per document (in editor and split modes) — the edit history is kept per file, with rapid typing coalesced into single steps. Reset reverts to the last saved version.
 - **Interactive task lists** — click a checkbox in the preview to toggle `- [ ]` ↔ `- [x]` in the source.
 - **Tabs** for multiple open documents with dirty-state indicators.
 - **Light & dark themes** with a toggle (system / light / dark), synced with your OS preference and remembered across visits.
@@ -53,6 +54,8 @@ After a reload, the browser will ask you to confirm access to the previously ope
 | Shortcut | Action |
 |---|---|
 | `Cmd/Ctrl + S` | Save the active file |
+| `Cmd/Ctrl + Z` | Undo |
+| `Cmd/Ctrl + Shift + Z` | Redo |
 | `Cmd/Ctrl + B` | Toggle the sidebar |
 | `Cmd/Ctrl + O` | Open a folder |
 
@@ -72,6 +75,7 @@ pnpm preview     # serve the production build
 Unit tests run with [Vitest](https://vitest.dev) + jsdom:
 
 - `scroll-sync.test.ts` — the editor/preview proportional scroll sync (ratio mapping both directions, echo suppression, non-scrollable and unregistered panes, teardown).
+- `documents.test.ts` — per-document undo/redo history and reset (coalescing, redo clearing, save baseline, isolation between docs).
 - `EditorPane.test.tsx` — regression guard: the CodeMirror container must keep a definite height so the editor can scroll.
 - `theme.test.ts` — theme-mode resolution and persistence.
 

@@ -3,12 +3,23 @@ import { create } from 'zustand'
 import { readFileText, writeFileText } from '@/lib/fs/file'
 import type { TreeNode } from '@/lib/fs/types'
 
+/** Consecutive edits within this window are coalesced into a single undo step. */
+export const HISTORY_COALESCE_MS = 500
+/** Maximum number of undo steps kept per document. */
+export const HISTORY_LIMIT = 200
+
 export interface EditorDocument {
   path: string
   name: string
   handle: FileSystemFileHandle
   content: string
   savedContent: string
+  /** Undo stack: previous contents, oldest first. */
+  past: string[]
+  /** Redo stack: undone contents, next-to-redo first. */
+  future: string[]
+  /** Timestamp of the last edit, used to coalesce typing bursts. */
+  lastEditAt: number
 }
 
 interface DocumentsState {
@@ -22,7 +33,9 @@ interface DocumentsState {
   closeAll: () => void
   updateContent: (path: string, content: string) => void
   save: (path: string) => Promise<void>
-  revert: (path: string) => void
+  undo: (path: string) => void
+  redo: (path: string) => void
+  reset: (path: string) => void
 }
 
 export function isDirty(doc: EditorDocument): boolean {
@@ -31,6 +44,20 @@ export function isDirty(doc: EditorDocument): boolean {
 
 export function hasUnsavedChanges(docs: Record<string, EditorDocument>): boolean {
   return Object.values(docs).some(isDirty)
+}
+
+export function canUndo(doc: EditorDocument): boolean {
+  return doc.past.length > 0
+}
+
+export function canRedo(doc: EditorDocument): boolean {
+  return doc.future.length > 0
+}
+
+function trimHistory(entries: string[]): string[] {
+  return entries.length > HISTORY_LIMIT
+    ? entries.slice(entries.length - HISTORY_LIMIT)
+    : entries
 }
 
 export const useDocumentsStore = create<DocumentsState>((set, get) => ({
@@ -56,6 +83,9 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
           handle,
           content,
           savedContent: content,
+          past: [],
+          future: [],
+          lastEditAt: 0,
         },
       },
       order: state.order.includes(node.path)
@@ -87,8 +117,18 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
   updateContent: (path, content) =>
     set((state) => {
       const doc = state.docs[path]
-      if (!doc) return state
-      return { docs: { ...state.docs, [path]: { ...doc, content } } }
+      if (!doc || doc.content === content) return state
+
+      const now = Date.now()
+      const startsNewStep = now - doc.lastEditAt > HISTORY_COALESCE_MS
+      const past = startsNewStep ? trimHistory([...doc.past, doc.content]) : doc.past
+
+      return {
+        docs: {
+          ...state.docs,
+          [path]: { ...doc, content, past, future: [], lastEditAt: now },
+        },
+      }
     }),
 
   save: async (path) => {
@@ -103,10 +143,62 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
     }))
   },
 
-  revert: (path) =>
+  undo: (path) =>
     set((state) => {
       const doc = state.docs[path]
-      if (!doc) return state
-      return { docs: { ...state.docs, [path]: { ...doc, content: doc.savedContent } } }
+      if (!doc || doc.past.length === 0) return state
+
+      const previous = doc.past[doc.past.length - 1]
+      return {
+        docs: {
+          ...state.docs,
+          [path]: {
+            ...doc,
+            content: previous,
+            past: doc.past.slice(0, -1),
+            future: [doc.content, ...doc.future],
+            lastEditAt: 0,
+          },
+        },
+      }
+    }),
+
+  redo: (path) =>
+    set((state) => {
+      const doc = state.docs[path]
+      if (!doc || doc.future.length === 0) return state
+
+      const next = doc.future[0]
+      return {
+        docs: {
+          ...state.docs,
+          [path]: {
+            ...doc,
+            content: next,
+            past: trimHistory([...doc.past, doc.content]),
+            future: doc.future.slice(1),
+            lastEditAt: 0,
+          },
+        },
+      }
+    }),
+
+  reset: (path) =>
+    set((state) => {
+      const doc = state.docs[path]
+      if (!doc || doc.content === doc.savedContent) return state
+
+      return {
+        docs: {
+          ...state.docs,
+          [path]: {
+            ...doc,
+            content: doc.savedContent,
+            past: trimHistory([...doc.past, doc.content]),
+            future: [],
+            lastEditAt: 0,
+          },
+        },
+      }
     }),
 }))
