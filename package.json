@@ -1,0 +1,57 @@
+{
+  "name": "markdown-editor",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A local-first web app to read, edit and save markdown files straight from your disk.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/menusal/markdown-editor.git"
+  },
+  "homepage": "https://github.com/menusal/markdown-editor#readme",
+  "bugs": {
+    "url": "https://github.com/menusal/markdown-editor/issues"
+  },
+  "keywords": [
+    "markdown",
+    "editor",
+    "react",
+    "vite",
+    "file-system-access-api"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/language-data": "^6.5.2",
+    "@codemirror/view": "^6.43.13",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@lezer/highlight": "^1.2.5",
+    "@uiw/react-codemirror": "^4.25.12",
+    "idb-keyval": "^6.3.0",
+    "motion": "^14.0.0",
+    "nuqs": "^2.10.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "oxlint": "^1.81.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}
