@@ -26,7 +26,15 @@ function createScroller(scrollHeight: number, clientHeight: number) {
   return el
 }
 
+/** A raw scroll event, e.g. one emitted by the editor without user input. */
 function scroll(el: HTMLElement) {
+  el.dispatchEvent(new Event('scroll'))
+}
+
+/** Simulates a user-driven scroll (wheel first, then the scroll event). */
+function userScroll(el: HTMLElement, top: number) {
+  el.dispatchEvent(new Event('wheel'))
+  el.scrollTop = top
   el.dispatchEvent(new Event('scroll'))
 }
 
@@ -38,8 +46,7 @@ describe('ScrollSync', () => {
     sync.registerEditor(editor)
     sync.registerPreview(preview)
 
-    editor.scrollTop = 400 // 50%
-    scroll(editor)
+    userScroll(editor, 400) // 50%
 
     expect(preview.scrollTop).toBe(800)
   })
@@ -51,8 +58,7 @@ describe('ScrollSync', () => {
     sync.registerEditor(editor)
     sync.registerPreview(preview)
 
-    preview.scrollTop = 1600 // 100%
-    scroll(preview)
+    userScroll(preview, 1600) // 100%
 
     expect(editor.scrollTop).toBe(800)
   })
@@ -64,13 +70,29 @@ describe('ScrollSync', () => {
     sync.registerEditor(editor)
     sync.registerPreview(preview)
 
-    editor.scrollTop = 400
-    scroll(editor)
+    userScroll(editor, 400)
     expect(preview.scrollTop).toBe(800)
 
     // The browser emits this after we set preview.scrollTop above.
     scroll(preview)
     expect(editor.scrollTop).toBe(400)
+  })
+
+  it('ignores scroll events that did not follow user input', () => {
+    const sync = new ScrollSync()
+    const editor = createScroller(1000, 200)
+    const preview = createScroller(2000, 400)
+    sync.registerEditor(editor)
+    sync.registerPreview(preview)
+
+    // User scrolled the preview earlier...
+    userScroll(preview, 1200)
+    expect(editor.scrollTop).toBe(600)
+
+    // ...then toggling a checkbox makes the editor emit an uninteracted scroll
+    // (CodeMirror resetting its position). It must not yank the preview.
+    scroll(editor)
+    expect(preview.scrollTop).toBe(1200)
   })
 
   it('does nothing when the source pane cannot scroll', () => {
@@ -80,7 +102,7 @@ describe('ScrollSync', () => {
     sync.registerEditor(editor)
     sync.registerPreview(preview)
 
-    scroll(editor)
+    userScroll(editor, 0)
 
     expect(preview.scrollTop).toBe(0)
   })
@@ -92,8 +114,7 @@ describe('ScrollSync', () => {
     sync.registerEditor(editor)
     sync.registerPreview(preview)
 
-    editor.scrollTop = 400
-    scroll(editor)
+    userScroll(editor, 400)
 
     expect(preview.scrollTop).toBe(0)
   })
@@ -103,10 +124,7 @@ describe('ScrollSync', () => {
     const editor = createScroller(1000, 200)
     sync.registerEditor(editor)
 
-    expect(() => {
-      editor.scrollTop = 400
-      scroll(editor)
-    }).not.toThrow()
+    expect(() => userScroll(editor, 400)).not.toThrow()
   })
 
   it('stops syncing after destroy', () => {
@@ -117,8 +135,7 @@ describe('ScrollSync', () => {
     sync.registerPreview(preview)
     sync.destroy()
 
-    editor.scrollTop = 400
-    scroll(editor)
+    userScroll(editor, 400)
 
     expect(preview.scrollTop).toBe(0)
   })
