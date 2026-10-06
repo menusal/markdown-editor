@@ -9,6 +9,7 @@ import { useProjectActions } from '@/hooks/useProjectActions'
 import { useSaveActive } from '@/hooks/useSaveActive'
 import { useTheme } from '@/hooks/useTheme'
 import { canRedo, canUndo, isDirty, useDocumentsStore } from '@/store/documents'
+import { useUiStore } from '@/store/ui'
 import { useWorkspaceStore } from '@/store/workspace'
 import { Button } from '@/components/ui/Button'
 import { Menu, MenuItem } from '@/components/ui/Menu'
@@ -25,6 +26,7 @@ import {
   RedoIcon,
   ResetIcon,
   SaveIcon,
+  SearchIcon,
   SidebarIcon,
   SunIcon,
   UndoIcon,
@@ -42,6 +44,7 @@ export function Toolbar() {
 
   const supported = useWorkspaceStore((s) => s.supported)
   const { openFolder, openLooseFiles } = useProjectActions()
+  const openSearch = useUiStore((s) => s.openSearch)
 
   const activeDoc = useDocumentsStore((s) =>
     s.activeDocId ? s.docs[s.activeDocId] : undefined,
@@ -105,6 +108,12 @@ export function Toolbar() {
             </ToolbarIconButton>
           </div>
         ) : null}
+        <ToolbarIconButton
+          label="Search (Ctrl/Cmd+K)"
+          onClick={() => openSearch('files')}
+        >
+          <SearchIcon />
+        </ToolbarIconButton>
         <ThemeToggle />
         <Button
           variant="secondary"

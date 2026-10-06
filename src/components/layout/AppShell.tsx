@@ -4,6 +4,8 @@ import { useQueryState } from 'nuqs'
 import { sidebarParam } from '@/lib/url'
 import { useWorkspaceStore } from '@/store/workspace'
 import { Sidebar } from '@/components/sidebar/Sidebar'
+import { SearchPalette } from '@/components/search/SearchPalette'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { StatusBar } from '@/components/layout/StatusBar'
 import { Toolbar } from '@/components/toolbar/Toolbar'
 import { Toaster } from '@/components/ui/Toaster'
@@ -40,6 +42,8 @@ export function AppShell() {
       </div>
 
       <StatusBar />
+      <SearchPalette />
+      <ConfirmDialog />
       <Toaster />
     </div>
   )

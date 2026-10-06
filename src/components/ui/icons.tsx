@@ -94,6 +94,15 @@ export function FolderOpenIcon(props: IconProps) {
   )
 }
 
+export function SearchIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.2-3.2" />
+    </svg>
+  )
+}
+
 export function SidebarIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

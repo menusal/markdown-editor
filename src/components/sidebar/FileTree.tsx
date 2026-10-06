@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
+import { useEffect } from 'react'
 
 import { cn } from '@/lib/cn'
 import { useDocumentsStore } from '@/store/documents'
@@ -10,6 +11,7 @@ import { ChevronRightIcon, FileTextIcon, FolderIcon } from '@/components/ui/icon
 
 export function FileTree({ project }: { project: Project }) {
   const toggleExpanded = useWorkspaceStore((s) => s.toggleExpanded)
+  const loadDirectory = useWorkspaceStore((s) => s.loadDirectory)
   const open = useDocumentsStore((s) => s.open)
   const activeDoc = useDocumentsStore((s) =>
     s.activeDocId ? s.docs[s.activeDocId] : undefined,
@@ -54,6 +56,7 @@ export function FileTree({ project }: { project: Project }) {
           activeNodeId={activeNodeId}
           onToggle={toggleExpanded}
           onOpen={handleOpen}
+          loadDirectory={loadDirectory}
         />
       ))}
     </ul>
@@ -67,10 +70,26 @@ interface TreeItemProps {
   activeNodeId: string | null
   onToggle: (nodeId: string) => void
   onOpen: (node: TreeNode) => void
+  loadDirectory: (nodeId: string) => Promise<void>
 }
 
-function TreeItem({ node, depth, expanded, activeNodeId, onToggle, onOpen }: TreeItemProps) {
+function TreeItem({
+  node,
+  depth,
+  expanded,
+  activeNodeId,
+  onToggle,
+  onOpen,
+  loadDirectory,
+}: TreeItemProps) {
   const isOpen = expanded[node.id] ?? false
+  const children = node.children
+
+  useEffect(() => {
+    if (node.kind === 'directory' && isOpen && children === undefined) {
+      void loadDirectory(node.id)
+    }
+  }, [node.kind, node.id, isOpen, children, loadDirectory])
 
   if (node.kind === 'directory') {
     return (
@@ -102,7 +121,7 @@ function TreeItem({ node, depth, expanded, activeNodeId, onToggle, onOpen }: Tre
               transition={{ duration: 0.18, ease: 'easeOut' }}
               className="space-y-4 overflow-hidden"
             >
-              {node.children.map((child) => (
+              {(children ?? []).map((child) => (
                 <TreeItem
                   key={child.id}
                   node={child}
@@ -111,6 +130,7 @@ function TreeItem({ node, depth, expanded, activeNodeId, onToggle, onOpen }: Tre
                   activeNodeId={activeNodeId}
                   onToggle={onToggle}
                   onOpen={onOpen}
+                  loadDirectory={loadDirectory}
                 />
               ))}
             </motion.ul>

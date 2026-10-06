@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 
 import { readFileText, writeFileText } from '@/lib/fs/file'
+import { extractTitle } from '@/lib/markdown/title'
 import type { TreeNode } from '@/lib/fs/types'
+import { useWorkspaceStore } from '@/store/workspace'
 
 /** Consecutive edits within this window are coalesced into a single undo step. */
 export const HISTORY_COALESCE_MS = 500
@@ -37,6 +39,8 @@ interface DocumentsState {
   activeDocId: string | null
   /** Last active document per project, to restore it when switching back. */
   lastActiveByProject: Record<string, string | null>
+  /** A line to reveal in the editor once the document is active. */
+  pendingReveal: { docId: string; line: number } | null
 
   open: (projectId: string, node: TreeNode) => Promise<void>
   activate: (docId: string) => void
@@ -49,6 +53,8 @@ interface DocumentsState {
   undo: (docId: string) => void
   redo: (docId: string) => void
   reset: (docId: string) => void
+  revealLine: (docId: string, line: number) => void
+  clearReveal: () => void
 }
 
 export function isDirty(doc: EditorDocument): boolean {
@@ -87,6 +93,7 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
   order: [],
   activeDocId: null,
   lastActiveByProject: {},
+  pendingReveal: null,
 
   open: async (projectId, node) => {
     const docId = makeDocId(projectId, node.id)
@@ -98,6 +105,9 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
 
     const handle = node.handle as FileSystemFileHandle
     const content = await readFileText(handle)
+    useWorkspaceStore
+      .getState()
+      .setFileTitle(projectId, node.id, extractTitle(content, node.name))
     set((state) => ({
       docs: {
         ...state.docs,
@@ -180,7 +190,13 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
     }),
 
   closeAll: () =>
-    set({ docs: {}, order: [], activeDocId: null, lastActiveByProject: {} }),
+    set({
+      docs: {},
+      order: [],
+      activeDocId: null,
+      lastActiveByProject: {},
+      pendingReveal: null,
+    }),
 
   setActiveProject: (projectId) =>
     set((state) => {
@@ -288,4 +304,8 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
         },
       }
     }),
+
+  revealLine: (docId, line) => set({ pendingReveal: { docId, line } }),
+
+  clearReveal: () => set({ pendingReveal: null }),
 }))

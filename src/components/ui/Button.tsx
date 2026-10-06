@@ -1,10 +1,10 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 
 import { cn } from '@/lib/cn'
 
-type Variant = 'primary' | 'secondary' | 'ghost'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends ComponentPropsWithRef<'button'> {
   variant?: Variant
   icon?: ReactNode
 }
@@ -16,6 +16,8 @@ const variants: Record<Variant, string> = {
     'bg-pure-white text-ink shadow-subtle-2 hover:bg-ash-mist',
   ghost:
     'bg-transparent text-graphite hover:bg-ash-mist hover:text-ink',
+  danger:
+    'bg-alert-red text-white shadow-subtle-2 hover:brightness-[0.97] active:brightness-95',
 }
 
 export function Button({

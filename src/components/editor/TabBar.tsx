@@ -4,6 +4,7 @@ import { useQueryState } from 'nuqs'
 import { cn } from '@/lib/cn'
 import { fileParam, projectParam } from '@/lib/url'
 import { isDirty, projectDocIds, useDocumentsStore } from '@/store/documents'
+import { useUiStore } from '@/store/ui'
 import { useWorkspaceStore } from '@/store/workspace'
 import { CloseIcon } from '@/components/ui/icons'
 
@@ -14,6 +15,7 @@ export function TabBar() {
   const activeDocId = useDocumentsStore((s) => s.activeDocId)
   const activate = useDocumentsStore((s) => s.activate)
   const close = useDocumentsStore((s) => s.close)
+  const confirm = useUiStore((s) => s.confirm)
   const [, setProject] = useQueryState('project', projectParam)
   const [, setFile] = useQueryState('file', fileParam)
 
@@ -28,12 +30,17 @@ export function TabBar() {
     }
   }
 
-  const handleClose = (docId: string) => {
+  const handleClose = async (docId: string) => {
     const doc = docs[docId]
     if (doc && isDirty(doc)) {
-      const confirmed = window.confirm(
-        `"${doc.name}" has unsaved changes. Close anyway?`,
-      )
+      const confirmed = await confirm({
+        title: `Close "${doc.name}"?`,
+        description:
+          'This file has unsaved changes. Closing it will discard them.',
+        confirmLabel: 'Close without saving',
+        cancelLabel: 'Keep editing',
+        danger: true,
+      })
       if (!confirmed) return
     }
     close(docId)
@@ -82,7 +89,7 @@ export function TabBar() {
             <button
               type="button"
               aria-label={`Close ${doc.name}`}
-              onClick={() => handleClose(docId)}
+              onClick={() => void handleClose(docId)}
               className="relative flex size-24 items-center justify-center rounded-full text-silver opacity-0 transition-opacity hover:bg-soft-fog hover:text-ink group-hover:opacity-100"
             >
               <CloseIcon width={14} height={14} />

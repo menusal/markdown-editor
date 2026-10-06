@@ -7,7 +7,11 @@ export interface TreeNode {
   name: string
   kind: TreeNodeKind
   handle: FileSystemFileHandle | FileSystemDirectoryHandle
-  children: TreeNode[]
+  /**
+   * Children of a directory. `undefined` means "not listed yet" (lazy): the
+   * folder is only enumerated when the user expands it.
+   */
+  children?: TreeNode[]
 }
 
 /** A loose (folder-less) markdown file tracked by a project. */

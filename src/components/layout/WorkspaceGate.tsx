@@ -23,7 +23,8 @@ export function WorkspaceGate() {
   const projects = useWorkspaceStore((s) => s.projects)
   const project = useWorkspaceStore(activeProject)
   const resume = useWorkspaceStore((s) => s.resume)
-  const { openFolder, openLooseFiles, selectProject, remove } = useProjectActions()
+  const { openFolder, openLooseFiles, selectProject, requestRemove } =
+    useProjectActions()
 
   if (status === 'loading') {
     return (
@@ -77,7 +78,7 @@ export function WorkspaceGate() {
       onOpenFolder={openFolder}
       onOpenFiles={openLooseFiles}
       onSelectProject={selectProject}
-      onRemoveProject={remove}
+      onRemoveProject={requestRemove}
     />
   )
 }
@@ -88,7 +89,7 @@ interface HomeProps {
   onOpenFolder: () => Promise<void>
   onOpenFiles: () => Promise<void>
   onSelectProject: (id: string) => void
-  onRemoveProject: (id: string) => Promise<void>
+  onRemoveProject: (id: string, name: string) => Promise<void>
 }
 
 function Home({
@@ -164,7 +165,7 @@ function Home({
                 <button
                   type="button"
                   aria-label={`Remove ${project.name}`}
-                  onClick={() => void onRemoveProject(project.id)}
+                  onClick={() => void onRemoveProject(project.id, project.name)}
                   className="flex size-24 shrink-0 items-center justify-center rounded-full text-silver opacity-0 transition-opacity hover:bg-soft-fog hover:text-ink group-hover:opacity-100"
                 >
                   <CloseIcon width={14} height={14} />

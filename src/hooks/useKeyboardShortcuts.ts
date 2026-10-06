@@ -4,10 +4,12 @@ import { useQueryState } from 'nuqs'
 import { sidebarParam } from '@/lib/url'
 import { useProjectActions } from '@/hooks/useProjectActions'
 import { useSaveActive } from '@/hooks/useSaveActive'
+import { useUiStore } from '@/store/ui'
 
 export function useKeyboardShortcuts() {
   const saveActive = useSaveActive()
   const { openFolder, openLooseFiles } = useProjectActions()
+  const openSearch = useUiStore((s) => s.openSearch)
   const [, setSidebarOpen] = useQueryState('sidebar', sidebarParam)
 
   useEffect(() => {
@@ -22,6 +24,9 @@ export function useKeyboardShortcuts() {
       } else if (key === 'b') {
         event.preventDefault()
         void setSidebarOpen((open) => !open)
+      } else if (key === 'k') {
+        event.preventDefault()
+        openSearch('files')
       } else if (key === 'o') {
         event.preventDefault()
         if (event.shiftKey) void openLooseFiles()
@@ -31,5 +36,6 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [saveActive, setSidebarOpen, openFolder, openLooseFiles])
+  }, [saveActive, setSidebarOpen, openFolder, openLooseFiles, openSearch])
 }
+

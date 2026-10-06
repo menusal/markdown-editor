@@ -13,7 +13,8 @@ export function ProjectSwitcher() {
   const projects = useWorkspaceStore((s) => s.projects)
   const activeProjectId = useWorkspaceStore((s) => s.activeProjectId)
   const active = projects.find((p) => p.id === activeProjectId) ?? null
-  const { openFolder, openLooseFiles, selectProject, remove } = useProjectActions()
+  const { openFolder, openLooseFiles, selectProject, requestRemove } =
+    useProjectActions()
 
   return (
     <Menu
@@ -99,7 +100,7 @@ export function ProjectSwitcher() {
                 icon={<CloseIcon width={16} height={16} />}
                 onClick={() => {
                   close()
-                  void remove(active.id)
+                  void requestRemove(active.id, active.name)
                 }}
               >
                 Remove “{active.name}”

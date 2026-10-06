@@ -24,9 +24,10 @@ This app relies on the [**File System Access API**](https://developer.mozilla.or
 
 ## Features
 
-- **Open a folder** and get a recursive treeview of its `.md` files (directories without markdown are pruned).
+- **Open a folder** and get a treeview of its `.md` files. Folders load lazily (only expanded levels are enumerated) and the first level is expanded by default, so large repositories open fast.
 - **Open individual files** — edit loose markdown files without opening a whole folder; they collect under an "Opened files" project.
 - **Multiple projects** — keep several folders and file collections open and switch between them from the sidebar; each project remembers its own tabs.
+- **Global search** (`Cmd/Ctrl + K`) — a command palette with two modes: **Files** (fuzzy by name/title) and **Text** (full-text across the project, in a Web Worker, jumping to the matching line).
 - **Formatted preview** with GFM support — tables, task lists, code blocks and more.
 - **Split view** with a draggable divider and synchronized scrolling, plus editor-only and preview-only modes.
 - **Edit & save** — write changes back to disk in place. `Cmd/Ctrl + S` or the **Save** button.
@@ -35,7 +36,7 @@ This app relies on the [**File System Access API**](https://developer.mozilla.or
 - **Tabs** for multiple open documents with dirty-state indicators, scoped to the active project.
 - **Light & dark themes** with a toggle (system / light / dark), synced with your OS preference and remembered across visits.
 - **URL state** — the active project, file, view mode and sidebar are mirrored in the URL.
-- **Remembers your projects** across reloads (the browser asks you to re-grant access).
+- **Remembers your projects** across reloads; a per-project file index is cached in IndexedDB so reopened projects feel instant.
 
 ## Getting started
 
@@ -60,6 +61,7 @@ After a reload, the browser will ask you to confirm access to the project you re
 | `Cmd/Ctrl + Z` | Undo |
 | `Cmd/Ctrl + Shift + Z` | Redo |
 | `Cmd/Ctrl + B` | Toggle the sidebar |
+| `Cmd/Ctrl + K` | Open the search palette (Files / Text) |
 | `Cmd/Ctrl + O` | Open a folder |
 | `Cmd/Ctrl + Shift + O` | Open individual files |
 
@@ -81,6 +83,9 @@ Unit tests run with [Vitest](https://vitest.dev) + jsdom:
 - `scroll-sync.test.ts` — the editor/preview proportional scroll sync (ratio mapping both directions, echo suppression, non-scrollable and unregistered panes, teardown).
 - `documents.test.ts` — per-document undo/redo history and reset (coalescing, redo clearing, save baseline, project namespacing, per-project tabs).
 - `workspace.test.ts` — projects: open a folder, avoid duplicates, switch, accumulate loose files with dedupe, remove.
+- `directory.test.ts` — lazy directory listing, id handling, `findNode`, `updateNodeChildren`, path resolution.
+- `fuzzy.test.ts` / `text.test.ts` — global search matching (fuzzy ranking, line-level text matcher).
+- `title.test.ts` — title extraction from the first heading.
 - `components.test.tsx` — interactive task-list checkboxes in the preview (enabled inputs, correct source line/state on toggle).
 - `picker.test.ts` — browser compatibility detection (Chromium picker + writable handles).
 - `WorkspaceGate.test.tsx` — the home shows a notice on unsupported browsers.
@@ -97,17 +102,20 @@ Unit tests run with [Vitest](https://vitest.dev) + jsdom:
 - **react-markdown** + **remark-gfm** — preview
 - **Tailwind CSS v4** — styling
 - **@fontsource** — Inter
-- **idb-keyval** — persist open projects (directory + file handles)
+- **idb-keyval** — persist open projects + cache the per-project file index
+- **Web Worker** — on-demand full-text search
 
 ## Architecture
 
 ```
 src/
-├─ lib/fs/         picker · directory · file · permissions · persist
-├─ lib/markdown/   components.tsx (render) · tasks.ts (checkboxes) · codemirror-theme.ts
+├─ lib/fs/         picker · directory · file · permissions · persist · index · indexCache
+├─ lib/markdown/   components.tsx (render) · tasks.ts (checkboxes) · title.ts · codemirror-theme.ts
+├─ lib/search/     fuzzy.ts · text.ts · worker-types.ts
+├─ workers/        search.worker.ts (full-text)
 ├─ store/          workspace (projects) · documents · ui
 ├─ hooks/          useDocumentRouting · useProjectActions · useKeyboardShortcuts · useUnsavedGuard · useSaveActive
-└─ components/     layout · toolbar · sidebar (ProjectSwitcher) · editor · ui (Menu)
+└─ components/     layout · toolbar · sidebar (ProjectSwitcher) · editor · search (SearchPalette) · ui (Menu)
 ```
 
 Design tokens live in `src/styles/theme.css` (Tailwind v4 `@theme`) and `src/styles/tokens.css` (CSS variables). Inter is the only typeface; hierarchy comes from size and weight rather than color.
@@ -117,6 +125,7 @@ Design tokens live in `src/styles/theme.css` (Tailwind v4 `@theme`) and `src/sty
 - Chromium browsers only (see [Browser compatibility](#-browser-compatibility)).
 - Access to a project must be re-granted after a reload.
 - Very large markdown files can feel sluggish in live preview.
+- Full-text search skips files larger than 1 MB and caps results; the first search in a large project walks its tree once.
 
 ## License
 

@@ -1,6 +1,16 @@
 import { create } from 'zustand'
 
-import { buildFileNodes, buildTree, collectDirectoryPaths } from '@/lib/fs/directory'
+import {
+  buildFileNodes,
+  listDirectory,
+  findNode,
+  updateNodeChildren,
+} from '@/lib/fs/directory'
+import {
+  buildProjectIndex,
+  type FileIndexEntry,
+} from '@/lib/fs/index'
+import { loadIndex, saveIndex, clearIndex } from '@/lib/fs/indexCache'
 import {
   isAbortError,
   isFileSystemAccessSupported,
@@ -35,8 +45,11 @@ export interface Project {
   name: string
   kind: ProjectKind
   source: ProjectSource
+  /** Root listing; directory children are loaded lazily on expand. */
   tree: TreeNode[]
   expanded: Record<string, boolean>
+  /** Flat list of markdown files for search + counting (cached). */
+  index: FileIndexEntry[]
 }
 
 interface ActivateOptions {
@@ -50,6 +63,8 @@ export interface WorkspaceState {
   error: string | null
   projects: Project[]
   activeProjectId: string | null
+  /** Directories currently being listed, keyed by `${projectId}:${nodeId}`. */
+  loadingDirs: Record<string, boolean>
 
   openDirectory: () => Promise<void>
   openFiles: () => Promise<void>
@@ -59,24 +74,30 @@ export interface WorkspaceState {
   resume: () => Promise<void>
   restore: () => Promise<void>
   toggleExpanded: (nodeId: string) => void
+  loadDirectory: (nodeId: string) => Promise<void>
+  setFileTitle: (projectId: string, nodeId: string, title: string) => void
 }
 
 export function activeProject(state: WorkspaceState): Project | null {
   return state.projects.find((p) => p.id === state.activeProjectId) ?? null
 }
 
-async function buildTreeForSource(
-  source: ProjectSource,
-): Promise<TreeNode[]> {
+async function buildRootTree(source: ProjectSource): Promise<TreeNode[]> {
   return source.kind === 'directory'
-    ? buildTree(source.dir)
+    ? listDirectory(source.dir, '')
     : buildFileNodes(source.entries)
 }
 
-function mergeExpanded(tree: TreeNode[], previous: Record<string, boolean>) {
+/** Expands the first level of folders by default. */
+function defaultExpanded(
+  tree: TreeNode[],
+  previous: Record<string, boolean>,
+): Record<string, boolean> {
   const expanded = { ...previous }
-  for (const path of collectDirectoryPaths(tree)) {
-    if (!(path in expanded)) expanded[path] = true
+  for (const node of tree) {
+    if (node.kind === 'directory' && !(node.id in expanded)) {
+      expanded[node.id] = true
+    }
   }
   return expanded
 }
@@ -114,6 +135,7 @@ function fromPersisted(project: PersistedProject): Project {
       source: { kind: 'directory', dir: project.dirHandle },
       tree: [],
       expanded: {},
+      index: [],
     }
   }
   return {
@@ -123,6 +145,7 @@ function fromPersisted(project: PersistedProject): Project {
     source: { kind: 'files', entries: project.entries ?? [] },
     tree: [],
     expanded: {},
+    index: [],
   }
 }
 
@@ -135,12 +158,34 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       projects: state.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)),
     }))
 
+  const rebuildIndex = async (projectId: string) => {
+    const project = get().projects.find((p) => p.id === projectId)
+    if (!project) return
+    try {
+      const entries = await buildProjectIndex(project.source)
+      const known = new Map(
+        (get().projects.find((p) => p.id === projectId)?.index ?? []).map(
+          (entry) => [entry.id, entry.title],
+        ),
+      )
+      const merged = entries.map((entry) => ({
+        ...entry,
+        title: known.get(entry.id) ?? entry.title,
+      }))
+      replaceProject(projectId, { index: merged })
+      await saveIndex(projectId, merged)
+    } catch {
+      // Index building is best-effort.
+    }
+  }
+
   return {
     supported: isFileSystemAccessSupported(),
     status: 'idle',
     error: null,
     projects: [],
     activeProjectId: null,
+    loadingDirs: {},
 
     openDirectory: async () => {
       if (!get().supported) {
@@ -177,6 +222,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
             source: { kind: 'directory', dir },
             tree: [],
             expanded: {},
+            index: [],
           }
           set((state) => ({ projects: [...state.projects, project as Project] }))
         }
@@ -219,11 +265,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
             }
           }
           if (!duplicate) {
-            existing.push({
-              id: crypto.randomUUID(),
-              name: handle.name,
-              handle,
-            })
+            existing.push({ id: crypto.randomUUID(), name: handle.name, handle })
           }
         }
 
@@ -234,13 +276,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
           source: { kind: 'files', entries: existing },
           tree: buildFileNodes(existing),
           expanded: {},
+          index: existing.map((entry) => ({
+            id: entry.id,
+            name: entry.name,
+            title: entry.name.replace(/\.(md|markdown)$/i, ''),
+          })),
         }
 
         set((state) => ({
           projects: loose
-            ? state.projects.map((p) =>
-                p.id === LOOSE_PROJECT_ID ? project : p,
-              )
+            ? state.projects.map((p) => (p.id === LOOSE_PROJECT_ID ? project : p))
             : [...state.projects, project],
         }))
 
@@ -272,14 +317,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       }
 
       try {
-        const tree = await buildTreeForSource(project.source)
+        const cachedIndex = await loadIndex(id)
+        const tree = await buildRootTree(project.source)
         replaceProject(id, {
           tree,
-          expanded: mergeExpanded(tree, project.expanded),
+          expanded: defaultExpanded(tree, project.expanded),
+          index: cachedIndex ?? project.index,
         })
         set({ status: 'ready' })
         await persist()
         useDocumentsStore.getState().setActiveProject(id)
+        void rebuildIndex(id)
       } catch {
         set({ status: 'error', error: 'Could not read the project.' })
         useDocumentsStore.getState().setActiveProject(id)
@@ -288,6 +336,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
 
     removeProject: async (id) => {
       useDocumentsStore.getState().closeProject(id)
+      void clearIndex(id)
       const projects = get().projects.filter((p) => p.id !== id)
       set({ projects })
 
@@ -319,12 +368,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
 
       set({ status: 'loading' })
       try {
-        const tree = await buildTreeForSource(project.source)
+        const tree = await buildRootTree(project.source)
         replaceProject(project.id, {
           tree,
-          expanded: mergeExpanded(tree, project.expanded),
+          expanded: defaultExpanded(tree, project.expanded),
         })
         set({ status: 'ready' })
+        void rebuildIndex(project.id)
       } catch {
         set({ status: 'error', error: 'Could not refresh the project.' })
       }
@@ -348,13 +398,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       }
 
       try {
-        const tree = await buildTreeForSource(project.source)
+        const tree = await buildRootTree(project.source)
         replaceProject(project.id, {
           tree,
-          expanded: mergeExpanded(tree, project.expanded),
+          expanded: defaultExpanded(tree, project.expanded),
         })
         set({ status: 'ready', error: null })
         useDocumentsStore.getState().setActiveProject(project.id)
+        void rebuildIndex(project.id)
       } catch {
         set({ status: 'error', error: 'Could not read the project.' })
       }
@@ -397,5 +448,49 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
             : project,
         ),
       })),
+
+    loadDirectory: async (nodeId) => {
+      const project = activeProject(get())
+      if (!project) return
+
+      const node = findNode(project.tree, nodeId)
+      if (!node || node.kind !== 'directory' || node.children !== undefined) return
+
+      const key = `${project.id}:${nodeId}`
+      if (get().loadingDirs[key]) return
+      set((state) => ({ loadingDirs: { ...state.loadingDirs, [key]: true } }))
+
+      try {
+        const children = await listDirectory(
+          node.handle as FileSystemDirectoryHandle,
+          node.id,
+        )
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === project.id
+              ? { ...p, tree: updateNodeChildren(p.tree, nodeId, children) }
+              : p,
+          ),
+        }))
+      } catch {
+        // Ignore listing errors (e.g. permission revoked mid-session).
+      } finally {
+        set((state) => {
+          const loadingDirs = { ...state.loadingDirs }
+          delete loadingDirs[key]
+          return { loadingDirs }
+        })
+      }
+    },
+
+    setFileTitle: (projectId, nodeId, title) => {
+      const project = get().projects.find((p) => p.id === projectId)
+      if (!project) return
+      const index = project.index.map((entry) =>
+        entry.id === nodeId ? { ...entry, title } : entry,
+      )
+      replaceProject(projectId, { index })
+      void saveIndex(projectId, index)
+    },
   }
 })

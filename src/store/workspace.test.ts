@@ -4,17 +4,27 @@ vi.mock('@/lib/fs/directory', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/fs/directory')>()
   return {
     ...actual,
-    buildTree: vi.fn(async () => [
+    listDirectory: vi.fn(async () => [
       {
         id: 'a.md',
         name: 'a.md',
         kind: 'file',
         handle: { name: 'a.md', kind: 'file' },
-        children: [],
       },
     ]),
   }
 })
+
+vi.mock('@/lib/fs/index', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/fs/index')>()
+  return { ...actual, buildProjectIndex: vi.fn(async () => []) }
+})
+
+vi.mock('@/lib/fs/indexCache', () => ({
+  saveIndex: vi.fn(async () => {}),
+  loadIndex: vi.fn(async () => null),
+  clearIndex: vi.fn(async () => {}),
+}))
 
 const { dirA, dirB, fileX, fileY } = vi.hoisted(() => {
   const make = (name: string, kind: 'directory' | 'file') => ({
@@ -42,6 +52,11 @@ vi.mock('@/lib/fs/picker', () => ({
 
 vi.mock('@/lib/fs/permissions', () => ({
   ensureSourcePermission: vi.fn(async () => true),
+}))
+
+vi.mock('@/lib/fs/file', () => ({
+  readFileText: vi.fn(async () => '# content'),
+  writeFileText: vi.fn(async () => {}),
 }))
 
 vi.mock('@/lib/fs/persist', () => ({
@@ -146,5 +161,29 @@ describe('workspace projects', () => {
     const state = useWorkspaceStore.getState()
     expect(state.projects).toHaveLength(1)
     expect(state.activeProjectId).toBe(state.projects[0].id)
+  })
+
+  it('switching to a project without documents clears the active document', async () => {
+    vi.mocked(pickDirectory)
+      .mockResolvedValueOnce(dirA as never)
+      .mockResolvedValueOnce(dirB as never)
+
+    await useWorkspaceStore.getState().openDirectory() // A
+    const projectA = useWorkspaceStore.getState().activeProjectId!
+    await useDocumentsStore.getState().open(projectA, {
+      id: 'a.md',
+      name: 'a.md',
+      kind: 'file',
+      handle: {} as FileSystemFileHandle,
+    })
+    expect(useDocumentsStore.getState().activeDocId).not.toBeNull()
+
+    await useWorkspaceStore.getState().openDirectory() // B
+
+    const projectB = useWorkspaceStore
+      .getState()
+      .projects.find((p) => p.name === 'Project B')!.id
+    expect(useWorkspaceStore.getState().activeProjectId).toBe(projectB)
+    expect(useDocumentsStore.getState().activeDocId).toBeNull()
   })
 })

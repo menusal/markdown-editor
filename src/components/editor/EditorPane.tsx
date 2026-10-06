@@ -30,6 +30,7 @@ export function EditorPane() {
 
   const sync = useScrollSync()
   const [view, setView] = useState<EditorView | null>(null)
+  const pendingReveal = useDocumentsStore((s) => s.pendingReveal)
 
   const extensions = useMemo(
     () => [
@@ -46,6 +47,18 @@ export function EditorPane() {
     sync.registerEditor(view.scrollDOM)
     return () => sync.registerEditor(null)
   }, [sync, view])
+
+  useEffect(() => {
+    if (!pendingReveal || !view || pendingReveal.docId !== activeDocId) return
+    const lineNo = Math.min(Math.max(pendingReveal.line, 1), view.state.doc.lines)
+    const line = view.state.doc.line(lineNo)
+    view.dispatch({
+      selection: { anchor: line.from },
+      effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
+    })
+    view.focus()
+    useDocumentsStore.getState().clearReveal()
+  }, [pendingReveal, view, activeDocId])
 
   if (!activeDocId) return null
 
