@@ -149,7 +149,7 @@ export function createMarkdownComponents({
       </blockquote>
     ),
     pre: ({ children }) => (
-      <pre className="my-16 overflow-x-auto rounded-lg bg-charcoal-card p-16 font-mono text-[13px] leading-[1.6] text-pure-white">
+      <pre className="my-16 overflow-x-auto rounded-lg bg-charcoal-card p-16 font-mono text-[13px] leading-[1.6] text-white">
         {children}
       </pre>
     ),

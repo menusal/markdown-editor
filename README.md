@@ -4,12 +4,11 @@
 
 A focused browser-based editor for markdown documents — reading plans, specs and SDD-style docs. Open a folder, browse its `.md` tree, edit with a live formatted preview and save changes **in place**, without a backend or uploading anything anywhere.
 
-<!-- TODO: replace with the deployed URL once it's live on Vercel -->
 ## Preview
 
-[![Live demo](https://img.shields.io/badge/demo-preview%20on%20Vercel-000000?style=flat-square&logo=vercel)](https://REPLACE-ME.vercel.app)
+[![Live demo](https://img.shields.io/badge/demo-preview%20on%20Vercel-000000?style=flat-square&logo=vercel)](https://markdown-editor-murex-five.vercel.app/)
 
-> 🚧 **Live demo coming soon** — deployed on [Vercel](https://vercel.com). Replace the badge/link above with the deployed URL.
+🔗 **Live demo:** https://markdown-editor-murex-five.vercel.app/ — deployed on [Vercel](https://vercel.com).
 
 ## ⚠️ Browser compatibility
 
@@ -31,6 +30,7 @@ This app relies on the [**File System Access API**](https://developer.mozilla.or
 - **Edit & save** — write changes back to disk in place. `Cmd/Ctrl + S` or the **Save** button.
 - **Interactive task lists** — click a checkbox in the preview to toggle `- [ ]` ↔ `- [x]` in the source.
 - **Tabs** for multiple open documents with dirty-state indicators.
+- **Light & dark themes** with a toggle (system / light / dark), synced with your OS preference and remembered across visits.
 - **URL state** — the active file, view mode and sidebar are mirrored in the URL.
 - **Remembers your folder** across reloads (the browser asks you to re-grant access).
 

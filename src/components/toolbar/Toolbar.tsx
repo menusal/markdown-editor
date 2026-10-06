@@ -2,8 +2,10 @@ import { motion } from 'motion/react'
 import { useQueryState } from 'nuqs'
 
 import { cn } from '@/lib/cn'
+import type { ThemeMode } from '@/lib/theme'
 import { VIEW_MODES, sidebarParam, viewParam, type ViewMode } from '@/lib/url'
 import { useSaveActive } from '@/hooks/useSaveActive'
+import { useTheme } from '@/hooks/useTheme'
 import { useDocumentsStore, isDirty } from '@/store/documents'
 import { useWorkspaceStore } from '@/store/workspace'
 import { Button } from '@/components/ui/Button'
@@ -12,8 +14,11 @@ import {
   ColumnsIcon,
   EyeIcon,
   FolderIcon,
+  MonitorIcon,
+  MoonIcon,
   SaveIcon,
   SidebarIcon,
+  SunIcon,
 } from '@/components/ui/icons'
 
 const viewMeta: Record<ViewMode, { label: string; icon: typeof ColumnsIcon }> = {
@@ -63,6 +68,7 @@ export function Toolbar() {
 
       <div className="ml-auto flex items-center gap-8">
         <ViewSwitcher view={view} onChange={(mode) => setView(mode)} />
+        <ThemeToggle />
         <Button
           variant="secondary"
           icon={<SaveIcon />}
@@ -82,6 +88,29 @@ export function Toolbar() {
         </Button>
       </div>
     </header>
+  )
+}
+
+const themeMeta: Record<ThemeMode, { label: string; icon: typeof SunIcon }> = {
+  system: { label: 'Theme: system', icon: MonitorIcon },
+  light: { label: 'Theme: light', icon: SunIcon },
+  dark: { label: 'Theme: dark', icon: MoonIcon },
+}
+
+function ThemeToggle() {
+  const { mode, cycle } = useTheme()
+  const { label, icon: Icon } = themeMeta[mode]
+
+  return (
+    <button
+      type="button"
+      onClick={cycle}
+      aria-label={`${label}. Click to change.`}
+      title={label}
+      className="flex size-32 shrink-0 items-center justify-center rounded-full text-steel transition-colors hover:bg-ash-mist hover:text-ink"
+    >
+      <Icon />
+    </button>
   )
 }
 

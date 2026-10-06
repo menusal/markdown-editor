@@ -2,11 +2,21 @@
 @import './theme.css';
 @import './tokens.css';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   html,
   body,
   #root {
     height: 100%;
+  }
+
+  :root {
+    color-scheme: light;
+  }
+
+  :root.dark {
+    color-scheme: dark;
   }
 
   body {
@@ -51,4 +61,30 @@
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
+}
+
+/*
+ * Dark theme: the semantic tokens are inverted so every utility that reads
+ * them (bg-pure-white, text-ink, border-soft-fog, …) adapts automatically.
+ * Surfaced as an unlayered rule so it wins over the layered @theme :root vars.
+ * `resolve-green` and `alert-red` stay as accents.
+ */
+:root.dark {
+  --color-warm-canvas: #0f0f0f;
+  --color-pure-white: #1a1a1a;
+  --color-ash-mist: #202020;
+  --color-soft-fog: #2b2b2b;
+  --color-ink: #f5f5f5;
+  --color-graphite: #b0b0b0;
+  --color-steel: #8f8f8f;
+  --color-silver: #6b6b6b;
+  --color-charcoal-card: #1e1e1e;
+  --color-highlight-wash: #3f3410;
+  --color-sienna-brand: #d8a56a;
+  --color-alert-red: #f87171;
+
+  --surface-warm-canvas: #0f0f0f;
+  --surface-pure-white: #1a1a1a;
+  --surface-ash-mist: #202020;
+  --surface-soft-fog: #2b2b2b;
 }
