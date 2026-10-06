@@ -19,24 +19,34 @@ export function createMarkdownComponents({
   onToggleTask,
 }: MarkdownComponentsOptions): Components {
   function TaskInput(props: ComponentProps<'input'> & WithNode) {
-    const { node, className, ...rest } = props
+    const { node, className, disabled, ...rest } = props
     void node
     const line = useContext(TaskLineContext)
 
     if (rest.type !== 'checkbox') {
-      return <input {...rest} className={className} />
+      return <input {...rest} className={className} disabled={disabled} />
     }
 
     const checkboxClass = cn(
-      'mr-8 size-16 align-[-2px] accent-resolve-green',
+      'mr-8 size-16 cursor-pointer align-[-2px] accent-resolve-green',
       className,
     )
     const checked = Boolean(rest.checked)
 
     if (line == null || !onToggleTask) {
-      return <input {...rest} className={checkboxClass} checked={checked} readOnly disabled />
+      return (
+        <input
+          {...rest}
+          className={checkboxClass}
+          checked={checked}
+          disabled
+          readOnly
+        />
+      )
     }
 
+    // remark-gfm marks the checkbox as disabled by default; drop that so the
+    // preview checkbox is interactive. `disabled` was destructured out above.
     return (
       <input
         {...rest}
