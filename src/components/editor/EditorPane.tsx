@@ -38,6 +38,7 @@ export function EditorPane() {
   return (
     <div className="h-full overflow-hidden">
       <CodeMirror
+        className="h-full"
         value={content}
         height="100%"
         theme="none"

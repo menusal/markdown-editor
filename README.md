@@ -59,11 +59,21 @@ After a reload, the browser will ask you to confirm access to the previously ope
 ## Scripts
 
 ```bash
-pnpm dev      # start the dev server
-pnpm build    # type-check (tsc -b) + production build
-pnpm preview  # serve the production build
-pnpm lint     # run oxlint
+pnpm dev         # start the dev server
+pnpm build       # type-check (tsc -b) + production build
+pnpm test        # run unit tests (vitest)
+pnpm test:watch  # run tests in watch mode
+pnpm lint        # run oxlint
+pnpm preview     # serve the production build
 ```
+
+### Tests
+
+Unit tests run with [Vitest](https://vitest.dev) + jsdom:
+
+- `scroll-sync.test.ts` — the editor/preview proportional scroll sync (ratio mapping both directions, echo suppression, non-scrollable and unregistered panes, teardown).
+- `EditorPane.test.tsx` — regression guard: the CodeMirror container must keep a definite height so the editor can scroll.
+- `theme.test.ts` — theme-mode resolution and persistence.
 
 ## Tech stack
 
