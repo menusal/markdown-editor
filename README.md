@@ -1,8 +1,8 @@
 # Markdown Editor
 
-> A local-first web app to read, edit and save markdown files straight from your disk.
+> A local-first markdown editor to review plans and SDD docs — or edit any markdown on your machine.
 
-A focused browser-based editor for markdown documents — reading plans, specs and SDD-style docs. Open a folder, browse its `.md` tree, edit with a live formatted preview and save changes **in place**, without a backend or uploading anything anywhere.
+A focused, browser-based editor for markdown documents. Open a folder, browse its `.md` tree, review plans, specs and **Spec-Driven Development (SDD)** docs, edit with a live formatted preview and save your changes **in place** — no backend, no sync, nothing ever uploaded anywhere.
 
 ## Preview
 
@@ -26,7 +26,7 @@ This app relies on the [**File System Access API**](https://developer.mozilla.or
 
 - **Open a folder** and get a recursive treeview of its `.md` files (directories without markdown are pruned).
 - **Formatted preview** with GFM support — tables, task lists, code blocks and more.
-- **Split view** with a draggable divider, plus editor-only and preview-only modes.
+- **Split view** with a draggable divider and synchronized scrolling, plus editor-only and preview-only modes.
 - **Edit & save** — write changes back to disk in place. `Cmd/Ctrl + S` or the **Save** button.
 - **Interactive task lists** — click a checkbox in the preview to toggle `- [ ]` ↔ `- [x]` in the source.
 - **Tabs** for multiple open documents with dirty-state indicators.

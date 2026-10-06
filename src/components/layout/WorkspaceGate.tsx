@@ -60,8 +60,8 @@ export function WorkspaceGate() {
   return (
     <EmptyState
       icon={<FolderIcon width={28} height={28} />}
-      title="Open a folder"
-      description="Pick a folder with your markdown files and browse, edit and save them."
+      title="Review plans and SDD. Edit markdown locally."
+      description="A local-first editor to read, review and edit your markdown — plans, specs and SDD docs. Open a folder to browse its .md files; everything stays on your machine, nothing is uploaded."
       action={
         <Button
           variant="primary"
