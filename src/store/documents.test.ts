@@ -5,6 +5,7 @@ vi.mock('@/lib/fs/file', () => ({
   writeFileText: vi.fn().mockResolvedValue(undefined),
 }))
 
+import { readFileText } from '@/lib/fs/file'
 import {
   HISTORY_COALESCE_MS,
   canRedo,
@@ -57,6 +58,8 @@ let now = 1000
 beforeEach(() => {
   now = 1000
   vi.spyOn(Date, 'now').mockImplementation(() => now)
+  vi.mocked(readFileText).mockReset()
+  vi.mocked(readFileText).mockResolvedValue('remote')
   useDocumentsStore.setState({
     docs: {},
     order: [],
@@ -216,5 +219,62 @@ describe('documents across projects', () => {
     expect(state.docs).toEqual({})
     expect(state.order).toEqual([])
     expect(state.activeDocId).toBeNull()
+  })
+})
+
+describe('reloadProject', () => {
+  it('re-reads clean documents from disk', async () => {
+    vi.mocked(readFileText).mockResolvedValueOnce('from disk')
+
+    const result = await useDocumentsStore.getState().reloadProject(P1)
+
+    expect(result.reloaded).toBe(1)
+    expect(doc().content).toBe('from disk')
+    expect(doc().savedContent).toBe('from disk')
+    expect(doc().past).toEqual([])
+  })
+
+  it('skips documents with unsaved changes', async () => {
+    useDocumentsStore.getState().updateContent(ID, 'local edit')
+    vi.mocked(readFileText).mockResolvedValueOnce('from disk')
+
+    const result = await useDocumentsStore.getState().reloadProject(P1)
+
+    expect(result.skipped).toEqual([NODE])
+    expect(doc().content).toBe('local edit')
+  })
+
+  it('does nothing when the on-disk content is unchanged', async () => {
+    vi.mocked(readFileText).mockResolvedValueOnce('A')
+
+    const result = await useDocumentsStore.getState().reloadProject(P1)
+
+    expect(result.reloaded).toBe(0)
+  })
+
+  it('only touches the given project', async () => {
+    const p2Id = makeDocId(P2, 'other.md')
+    useDocumentsStore.setState((state) => ({
+      docs: {
+        ...state.docs,
+        [p2Id]: {
+          ...state.docs[ID],
+          id: p2Id,
+          projectId: P2,
+          nodeId: 'other.md',
+          name: 'other.md',
+          content: 'A',
+          savedContent: 'A',
+        },
+      },
+      order: [ID, p2Id],
+    }))
+    vi.mocked(readFileText).mockResolvedValue('from disk')
+
+    const result = await useDocumentsStore.getState().reloadProject(P2)
+
+    expect(result.reloaded).toBe(1)
+    expect(useDocumentsStore.getState().docs[p2Id].content).toBe('from disk')
+    expect(doc(ID).content).toBe('A') // P1 untouched
   })
 })

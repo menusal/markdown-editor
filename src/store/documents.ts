@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import { readFileText, writeFileText } from '@/lib/fs/file'
+import { resolveFileHandle } from '@/lib/fs/directory'
 import { extractTitle } from '@/lib/markdown/title'
 import type { TreeNode } from '@/lib/fs/types'
 import { useWorkspaceStore } from '@/store/workspace'
@@ -55,6 +56,14 @@ interface DocumentsState {
   reset: (docId: string) => void
   revealLine: (docId: string, line: number) => void
   clearReveal: () => void
+  /**
+   * Re-reads from disk every document of a project that has no local changes.
+   * Dirty documents are left untouched (and reported) so external edits never
+   * silently discard unsaved work.
+   */
+  reloadProject: (
+    projectId: string,
+  ) => Promise<{ reloaded: number; skipped: string[] }>
 }
 
 export function isDirty(doc: EditorDocument): boolean {
@@ -308,4 +317,63 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
   revealLine: (docId, line) => set({ pendingReveal: { docId, line } }),
 
   clearReveal: () => set({ pendingReveal: null }),
+
+  reloadProject: async (projectId) => {
+    const workspace = useWorkspaceStore.getState()
+    const project = workspace.projects.find((p) => p.id === projectId)
+    const dirHandle =
+      project?.source.kind === 'directory' ? project.source.dir : null
+
+    const targets = Object.values(get().docs).filter(
+      (doc) => doc.projectId === projectId,
+    )
+    let reloaded = 0
+    const skipped: string[] = []
+
+    for (const doc of targets) {
+      if (isDirty(doc)) {
+        skipped.push(doc.name)
+        continue
+      }
+
+      let handle = doc.handle
+      let content: string | null = null
+      try {
+        content = await readFileText(handle)
+      } catch {
+        // The file may have been replaced; re-resolve the handle by path.
+        if (dirHandle) {
+          const resolved = await resolveFileHandle(dirHandle, doc.nodeId)
+          if (resolved) {
+            handle = resolved
+            try {
+              content = await readFileText(handle)
+            } catch {
+              content = null
+            }
+          }
+        }
+      }
+
+      if (content === null || content === doc.content) continue
+
+      set((state) => ({
+        docs: {
+          ...state.docs,
+          [doc.id]: {
+            ...doc,
+            handle,
+            content,
+            savedContent: content,
+            past: [],
+            future: [],
+            lastEditAt: 0,
+          },
+        },
+      }))
+      reloaded += 1
+    }
+
+    return { reloaded, skipped }
+  },
 }))
