@@ -35,16 +35,20 @@ export async function collectFileHandles(
 
   const entries: FileHandleEntry[] = []
   async function walk(dir: FileSystemDirectoryHandle, base: string) {
-    for await (const entry of dir.values()) {
-      if (IGNORED_NAMES.has(entry.name)) continue
-      const id = base ? `${base}/${entry.name}` : entry.name
-      if (entry.kind === 'file') {
-        if (isMarkdownFile(entry.name)) {
-          entries.push({ id, name: entry.name, handle: entry })
+    try {
+      for await (const entry of dir.values()) {
+        if (IGNORED_NAMES.has(entry.name)) continue
+        const id = base ? `${base}/${entry.name}` : entry.name
+        if (entry.kind === 'file') {
+          if (isMarkdownFile(entry.name)) {
+            entries.push({ id, name: entry.name, handle: entry })
+          }
+        } else {
+          await walk(entry, id)
         }
-      } else {
-        await walk(entry, id)
       }
+    } catch {
+      // Skip directories we can't read; a single one must not abort the walk.
     }
   }
   await walk(source.dir, '')
@@ -69,16 +73,24 @@ export async function buildProjectIndex(
   const entries: FileIndexEntry[] = []
 
   async function walk(dir: FileSystemDirectoryHandle, base: string) {
-    for await (const entry of dir.values()) {
-      if (IGNORED_NAMES.has(entry.name)) continue
-      const id = base ? `${base}/${entry.name}` : entry.name
-      if (entry.kind === 'file') {
-        if (isMarkdownFile(entry.name)) {
-          entries.push({ id, name: entry.name, title: titleFromName(entry.name) })
+    try {
+      for await (const entry of dir.values()) {
+        if (IGNORED_NAMES.has(entry.name)) continue
+        const id = base ? `${base}/${entry.name}` : entry.name
+        if (entry.kind === 'file') {
+          if (isMarkdownFile(entry.name)) {
+            entries.push({
+              id,
+              name: entry.name,
+              title: titleFromName(entry.name),
+            })
+          }
+        } else {
+          await walk(entry, id)
         }
-      } else {
-        await walk(entry, id)
       }
+    } catch {
+      // Skip directories we can't read; a single one must not abort the index.
     }
   }
 
